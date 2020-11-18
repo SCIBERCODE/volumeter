@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="aq6Tsq" name="volumeter" projectType="guiapp" useAppConfig="0"
               addUsingNamespaceToJuceHeader="1" jucerFormatVersion="1" compilerFlagSchemes="NewScheme"
-              cppLanguageStandard="17" displaySplashScreen="0" headerPath="..\..\ASIO\common\">
+              cppLanguageStandard="17" displaySplashScreen="0" headerPath="..\..\Libs\asio_sdk\common\">
   <MAINGROUP id="US7HFq" name="volumeter">
     <GROUP id="{4D1FF0D6-F97F-78FF-33FC-9D81D7CAB011}" name="Source">
       <FILE id="FOprC1" name="main.cpp" compile="1" resource="0" file="Source/main.cpp"/>
@@ -14,8 +14,8 @@
   <EXPORTFORMATS>
     <VS2017 targetFolder="Builds/VisualStudio2017">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="volumeter"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="volumeter"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="volumeter" winArchitecture="Win32"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="volumeter" winArchitecture="Win32"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../audio/juce/modules"/>

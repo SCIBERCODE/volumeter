@@ -1,0 +1,321 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Header Files\dsp_classes">
+      <UniqueIdentifier>{0e2d98bf-146a-4c10-b78c-e04252586a2b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\dsp_functions">
+      <UniqueIdentifier>{b7863d26-d512-4df2-8236-356e5ee69d94}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\filters">
+      <UniqueIdentifier>{44316106-dcdd-4988-bd48-973e7f0960b7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\filters">
+      <UniqueIdentifier>{96aca970-897a-4712-96ae-2718a8646464}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\dsp_classes\circ_buffer.h">
+      <Filter>Header Files\dsp_classes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dsp_classes\delay.h">
+      <Filter>Header Files\dsp_classes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dsp_functions\convolve.h">
+      <Filter>Header Files\dsp_functions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dsp_functions\fliplr.h">
+      <Filter>Header Files\dsp_functions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dsp_functions\partial_convolve.h">
+      <Filter>Header Files\dsp_functions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\allpass.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\allpass_1.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\allpass_2nd.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\audio_equalizer.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\biquad.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\butterworth_allpass.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\butterworth_fir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\butterworth_iir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\calculate_decimator_taps.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\cascaded_cic.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\chebyshev_iir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\chebyshev2_iir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\cic.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\create_remez_lpfir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\cutboost.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\decimator.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\design_fir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\design_iir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\design_window.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\elliptic_allpass.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\elliptic_iir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\farrow.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\farrow_upsampler.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\find_roots.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\fir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\fir_adapt.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\fir_coeff.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\fir_decim.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\fir_interp.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\fir_inv_dft.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\gaussian_fir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\iir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\iir_1st.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\iir_allpass_variable_cascade.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\iir_allpass1_sections.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\iir_allpass1_sections_variable_delay.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\iir_coeff.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\iir_comb.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\iir_df.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\iir_shelf.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\lagrange.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\notch_allpass.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\notch_comb.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\notch_iir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\raised_cosine.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\raised_cosine_imp.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\remez_estimate.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\remez_fir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\root_raised_cosine.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\root_raised_cosine_imp.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\running_average.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\running_sum.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\scic.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\shelf_allpass1.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\sinc_fir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\sinc_helper.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\transform_fir.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filters\window.h">
+      <Filter>Header Files\filters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\base_type.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\complex_operators.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\mixed_type.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\typedefs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\filters\audio_equalizer.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\butterworth_allpass.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\butterworth_fir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\butterworth_iir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\calculate_decimator_taps.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\chebyshev_iir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\chebyshev2_iir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\create_remez_fir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\create_remez_lpfir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\design_fir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\design_iir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\design_window.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\elliptic_allpass.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\elliptic_iir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\farrow_upsampler.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\find_roots.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\fir_coeff.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\fir_inv_dft.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\gaussian_fir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\iir_coeff.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\raised_cosine_imp.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\remez_estimate.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\remez_fir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\root_raised_cosine_imp.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\shelf_allpass1.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\sinc_fir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\sinc_helper.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\transform_fir.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filters\window.cpp">
+      <Filter>Source Files\filters</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
