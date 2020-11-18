@@ -3,6 +3,8 @@
 #include "theme.h"
 using namespace std;
 
+#include <spuce/filters/iir.h>
+
 extern unique_ptr<ApplicationProperties> _settings;
 
 const vector<float>    _buff_size_list = { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 10.0f };
@@ -26,6 +28,8 @@ struct cal_t {
 
 auto prefix(double value, String unit, size_t numder_of_decimals)
 {
+	spuce::iir_coeff sdf(1, spuce::filter_type::high);
+
 	auto   symbol    = String();
 	double new_value = value;
 
