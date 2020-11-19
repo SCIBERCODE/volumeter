@@ -30,7 +30,6 @@ namespace theme
 		const Colour black   = grey_level(0);
 	public:
 		light() {
-
 			auto scheme = getLightColourScheme();
 			scheme.setUIColour(ColourScheme::outline, outline);
 			scheme.setUIColour(ColourScheme::UIColour::defaultText, black);
@@ -64,9 +63,35 @@ namespace theme
 		Font getComboBoxFont(ComboBox &) {
 			return Font(13.5f);
 		}
+
+		void drawToggleButton(Graphics& g, ToggleButton& button,
+			bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
+		{
+			auto fontSize = jmin(15.0f, button.getHeight() * 0.75f);
+			auto tickWidth = fontSize * 1.1f;
+
+			drawTickBox(g, button, 4.0f, (button.getHeight() - tickWidth) * 0.5f,
+				tickWidth, tickWidth,
+				button.getToggleState(),
+				button.isEnabled(),
+				shouldDrawButtonAsHighlighted,
+				shouldDrawButtonAsDown);
+
+			g.setColour(button.findColour(ToggleButton::textColourId));
+			Font font(fontSize);
+			g.setFont(button.getToggleState() ? font.boldened() : font);
+
+			if (!button.isEnabled())
+				g.setOpacity(0.5f);
+
+			g.drawFittedText(button.getButtonText(),
+				button.getLocalBounds().withTrimmedLeft(roundToInt(tickWidth) + 10)
+				.withTrimmedRight(2),
+				Justification::centredLeft, 10);
+		}
 	};
 
-	class checkbox_right_lf : public light
+	class checkbox_right_text_lf : public light
 	{
 	public:
 		void drawToggleButton(Graphics& g, ToggleButton& button,
@@ -95,5 +120,33 @@ namespace theme
 		}
 	};
 
+	class checkbox_right_lf : public light
+	{
+	public:
+		void drawToggleButton(Graphics& g, ToggleButton& button,
+			bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
+		{
+			auto fontSize = jmin(15.0f, button.getHeight() * 0.75f);
+			auto tickWidth = fontSize * 1.1f;
 
-} // namespace theme
+			g.setColour(button.findColour(ToggleButton::textColourId));
+			Font font(fontSize);
+			g.setFont(button.getToggleState() ? font.boldened() : font);
+
+			if (!button.isEnabled())
+				g.setOpacity(0.5f);
+
+			g.drawFittedText(button.getButtonText(),
+				button.getLocalBounds().withTrimmedRight(6 + (int)tickWidth),
+				Justification::centredRight, 10);		
+
+			//font.getStringWidth(button.getButtonText())
+			drawTickBox(g, button, button.getWidth() - tickWidth, (button.getHeight() - tickWidth) * 0.5f,
+				tickWidth, tickWidth,
+				button.getToggleState(),
+				button.isEnabled(),
+				shouldDrawButtonAsHighlighted,
+				shouldDrawButtonAsDown);
+		}
+	};
+}

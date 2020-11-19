@@ -4,11 +4,13 @@
 using namespace std;
 
 #include <spuce/filters/iir.h>
+#include <spuce/filters/butterworth_iir.h>
 
 extern unique_ptr<ApplicationProperties> _settings;
 
 const vector<float>    _buff_size_list = { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 10.0f };
 const vector<int>      _tone_list      = { 10, 20, 200, 500, 1000, 5000, 10000, 20000 };
+const vector<int>      _order_list     = { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200 };
 const map<int, String> _prefs          = {
 	{ -15,  "f" },
 	{ -12,  "p" },
@@ -28,8 +30,6 @@ struct cal_t {
 
 auto prefix(double value, String unit, size_t numder_of_decimals)
 {
-	spuce::iir_coeff sdf(1, spuce::filter_type::high);
-
 	auto   symbol    = String();
 	double new_value = value;
 
@@ -351,37 +351,33 @@ public:
 	}
 };
 
-unique_ptr<circular_buffer<float>> _buff_l;
-unique_ptr<circular_buffer<float>> _buff_r;
-
-double _zero_l = 0, _zero_r = 0;
-double _sample_rate = 0.0;
-double _l[2] = { 555,555 }, _r[2] = { 555,555 }, _b[2] = { 555,555 };
-
 //==============================================================================
-class MainContentComponent   : public AudioAppComponent,
-                               public Timer,
-							   public ChangeListener
+class MainContentComponent : public AudioAppComponent,
+                             public Timer,
+                             public ChangeListener
 {
 public:
 	void clear_stat() {
-		_l[0] = 555; _l[1] = 555; _r[0] = 555; _r[1] = 555; _b[0] = 555; _b[1] = 555;
+		for (size_t k = 0; k < 3; k++) {
+			minmax[k][0] = 555;
+			minmax[k][1] = 555;
+		}
 	}
 
 	void changeListenerCallback(ChangeBroadcaster* /*source*/) {
 	}
 
-    MainContentComponent()
-    {
-		_buff_l.reset(new circular_buffer<float>(0));
-		_buff_r.reset(new circular_buffer<float>(0));
+	MainContentComponent()
+	{
+		buff[0].reset(new circular_buffer<float>(0));
+		buff[1].reset(new circular_buffer<float>(0));
 
-        addAndMakeVisible (&zero_button);
+		addAndMakeVisible (&zero_button);
 		zero_button.setButtonText ("Set zero");
 		zero_button.onClick = [this]
 		{
-			_zero_l = gain2db(_buff_l->get_value());
-			_zero_r = gain2db(_buff_r->get_value());
+			zero[0] = gain2db(buff[0]->get_value());
+			zero[1] = gain2db(buff[1]->get_value());
 			clear_stat();
 		};
 
@@ -389,8 +385,7 @@ public:
 		reset_zero_button.setButtonText("Reset zero");
 		reset_zero_button.onClick = [this]
 		{
-			_zero_l = 0;
-			_zero_r = 0;
+			zero[0] = 0; zero[1] = 0;
 			clear_stat();
 		};
 
@@ -404,7 +399,7 @@ public:
 		addAndMakeVisible(tone_checkbox);
 		addAndMakeVisible(tone_combo);
 		tone_checkbox.setToggleState(_LOAD_INT("tone", "0"), dontSendNotification);
-		tone_checkbox.setLookAndFeel(&theme_right);
+		tone_checkbox.setLookAndFeel(&theme_right_text);
 		tone_checkbox.onClick = [this] {
 			clear_stat();
 			_SAVE("tone", tone_checkbox.getToggleState());
@@ -431,10 +426,10 @@ public:
 		buff_size_combo.onChange = [this]
 		{
 			auto val = buff_size_combo.getSelectedId();
-			if (val && _sample_rate) {
-				auto samples = (size_t)(val / (1000.0 / _sample_rate));
-				_buff_l.reset(new circular_buffer<float>(samples));
-				_buff_r.reset(new circular_buffer<float>(samples));
+			if (val && sample_rate) {
+				auto samples = (size_t)(val / (1000.0 / sample_rate));
+				buff[0].reset(new circular_buffer<float>(samples));
+				buff[1].reset(new circular_buffer<float>(samples));
 			}
 			_SAVE("buff_size", val);
 		};		
@@ -493,7 +488,7 @@ public:
 		cal_label_ch.attachToComponent(&cal_edit_ch[0], true);
 		cal_edit_name.setTextToShowWhenEmpty("Calibration Name (optional)", Colours::grey);
 		cal_edit_ch[0].setTextToShowWhenEmpty("0.0", Colours::grey); // todo: change hint according to selected pref
-		cal_edit_ch[1].setTextToShowWhenEmpty("0.0", Colours::grey);		
+		cal_edit_ch[1].setTextToShowWhenEmpty("0.0", Colours::grey);
 		cal_edit_ch[0].setInputRestrictions(0, "0123456789.");
 		cal_edit_ch[1].setInputRestrictions(0, "0123456789.");
 		for (auto const pref : _prefs)
@@ -507,7 +502,7 @@ public:
 		};
 
 		cal_button.setButtonText("Add");
-		cal_button.onClick = [=] 
+		cal_button.onClick = [=]
 		{
 			String ch_t[2] = { cal_edit_ch[0].getText(), cal_edit_ch[1].getText() };
 			if (ch_t[0].isEmpty() || ch_t[1].isEmpty()) return;
@@ -516,7 +511,7 @@ public:
 			double ch[2] = {
 				ch_t[0].getDoubleValue() * pow(10.0, pref),
 				ch_t[1].getDoubleValue() * pow(10.0, pref)
-			};			
+			};
 
 			auto cals = _settings->getUserSettings()->getXmlValue("calibrations");
 			if (cals == nullptr) {
@@ -525,16 +520,14 @@ public:
 			auto* e = cals->createNewChildElement("ROW");
 			e->setAttribute("name",       cal_edit_name.getText());
 			e->setAttribute("left",       ch[0]);
-			e->setAttribute("left_coef",  ch[0] / _buff_l->get_value());
+			e->setAttribute("left_coef",  ch[0] / buff[0]->get_value());
 			e->setAttribute("right",      ch[1]);
-			e->setAttribute("right_coef", ch[1] / _buff_r->get_value()); // todo: check for nan
+			e->setAttribute("right_coef", ch[1] / buff[1]->get_value()); // todo: check for nan
 
 			_settings->getUserSettings()->setValue("calibrations", cals.get());
 			_settings->saveIfNeeded();
 			cal_table_update();
 		};
-
-        setSize (420, 635);
 
 		setAudioChannels(2, 2);
 
@@ -578,7 +571,7 @@ public:
 		}
 		outputs_combo.onChange = [this]
 		{
-			_buff_l->clear(); _buff_r->clear();
+			buff[0]->clear(); buff[1]->clear();
 			clear_stat();
 
 			_SAVE("device", outputs_combo.getText());
@@ -616,64 +609,146 @@ public:
 			clear_stat(); // todo: сохранять статистику, переводя в вольты
 		};
 
+		// === filter ==================================================================
+
+		addAndMakeVisible(bpfH_checkbox);
+		addAndMakeVisible(bpfL_checkbox);
+		addAndMakeVisible(high_slider);
+		addAndMakeVisible(order_combo);
+
+		bpfH_checkbox.setToggleState(_LOAD_INT("use_bpfH", "0"), dontSendNotification);
+		bpfH_checkbox.setLookAndFeel(&theme_right);
+
+		bpfH_checkbox.onClick = [this] {
+			_SAVE("use_bpfH", bpfH_checkbox.getToggleState());
+			filter_init();
+		};
+		bpfL_checkbox.setToggleState(_LOAD_INT("use_bpfL", "0"), dontSendNotification);
+		bpfL_checkbox.onClick = [this] {
+			_SAVE("use_bpfL", bpfL_checkbox.getToggleState());
+			filter_init();
+		};
+
+		high_slider.setSliderStyle(Slider::LinearHorizontal);
+		high_slider.setTextBoxStyle(Slider::TextBoxRight, false, 60, 20);
+		high_slider.setRange(20, 20000, 1);
+		high_slider.setValue(15000, dontSendNotification);
+		high_slider.onDragEnd = [this] {
+			filter_init();
+		};
+
+		for (auto const item : _order_list)
+			order_combo.addItem(String(item), item);
+
+		order_combo.setSelectedId(120, dontSendNotification);
+		order_combo.setTooltip("Filter Order");
+		order_combo.onChange = [this]
+		{
+			order = order_combo.getSelectedId();
+			filter_init();
+		};
+
 		addAndMakeVisible(table_cals);
 		cal_table_update();
 
+		setSize(420, 670);
 		startTimer(100);
-    }
-	   
-    ~MainContentComponent() override
-    {
-        shutdownAudio();
-		tone_checkbox.setLookAndFeel(nullptr);
-    }
-
-    void prepareToPlay (int /*samples_per_block*/, double sample_rate) override
-    {
-		_sample_rate = sample_rate;
-		buff_size_combo.onChange();
-
-		osc.set_sample_rate(sample_rate);		
-		osc.set_freq((float)_LOAD_INT("tone_value"));
-		osc.reset();
 	}
 
-    void getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill) override
-    {
-		auto rdata_l = bufferToFill.buffer->getReadPointer(0, bufferToFill.startSample);
-		auto rdata_r = bufferToFill.buffer->getReadPointer(1, bufferToFill.startSample);
+	~MainContentComponent() override
+	{
+		shutdownAudio();
+		tone_checkbox.setLookAndFeel(nullptr);
+		bpfH_checkbox.setLookAndFeel(nullptr);
+	}
 
-		for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
+	void filter_init()
+	{
 		{
-			if (rdata_l[sample]) _buff_l->enqueue(rdata_l[sample]);
-			if (rdata_r[sample]) _buff_r->enqueue(rdata_r[sample]);
+			lock_guard<mutex> locker(audio_process);
+			high_slider.setRange(20.0, sample_rate / 2.0, 1.0);
+
+			if (bpfH_checkbox.getToggleState())
+			{
+				spuce::iir_coeff bpfH(order, spuce::filter_type::high);
+				spuce::butterworth_iir(bpfH, 20.0 / sample_rate, 3.0);
+				iir[0].reset(new spuce::iir<spuce::float_type, spuce::float_type>(bpfH));
+			}
+			if (bpfL_checkbox.getToggleState())
+			{
+				spuce::iir_coeff bpfL(order, spuce::filter_type::low);
+				spuce::butterworth_iir(bpfL, high_slider.getValue() / sample_rate, 3.0);
+				iir[1].reset(new spuce::iir<spuce::float_type, spuce::float_type>(bpfL));
+			}
 		}
+		high_slider.repaint();
+	};
+
+	void prepareToPlay (int /*samples_per_block*/, double sample_rate_) override
+	{
+		sample_rate = sample_rate_;
+		buff_size_combo.onChange();
+
+		osc.set_sample_rate(sample_rate);
+		osc.set_freq((float)_LOAD_INT("tone_value"));
+		osc.reset();
+
+		filter_init();
+	}
+
+	void getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill) override
+	{
+		auto r = bufferToFill.buffer->getArrayOfReadPointers();
+		auto w = bufferToFill.buffer->getArrayOfWritePointers();
+
+		for (int sample_idx = 0; sample_idx < bufferToFill.numSamples; ++sample_idx)
+		{
+			if (r[0][sample_idx]) buff[0]->enqueue(r[0][sample_idx]);
+			if (r[1][sample_idx]) buff[1]->enqueue(r[1][sample_idx]);
+		}
+
 		if (tone_checkbox.getToggleState())
 		{
-			auto wdata_l = bufferToFill.buffer->getWritePointer(0, bufferToFill.startSample);
-			auto wdata_r = bufferToFill.buffer->getWritePointer(1, bufferToFill.startSample);
-
 			for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
 			{
 				auto tone_sample = osc.sample();
-				wdata_l[sample] = tone_sample;
-				wdata_r[sample] = tone_sample;
+				w[0][sample] = tone_sample;
+				w[1][sample] = tone_sample;
 			}
 		}
 		else {
-			bufferToFill.clearActiveBufferRegion();
+			if (audio_process.try_lock())
+			{
+				auto use_bpfH = bpfH_checkbox.getToggleState() && iir[0];
+				auto use_bpfL = bpfL_checkbox.getToggleState() && iir[1];
+
+				if (use_bpfH || use_bpfL)
+				{
+					for (size_t ch = 0; ch < 2; ++ch) {
+						for (int sample_idx = 0; sample_idx < bufferToFill.numSamples; ++sample_idx)
+						{
+							spuce::float_type sample = r[ch][sample_idx]; // random.nextFloat();
+							if (use_bpfH) sample = iir[0]->clock(sample);
+							if (use_bpfL) sample = iir[1]->clock(sample);
+							w[ch][sample_idx] = (float)sample;
+						}
+						if (use_bpfH) iir[0]->reset();
+						if (use_bpfL) iir[1]->reset();
+					}
+				}
+				audio_process.unlock();
+			}
 		}
-    }
+		//else bufferToFill.clearActiveBufferRegion();
+	}
 
-    void releaseResources() override
+	void releaseResources() override { }
+
+	void resized() override
 	{
-    }
-
-    void resized() override
-    {
 		const size_t height = 20;
 		const size_t margin = 5;
-		const size_t label = 75;
+		const size_t label  = 75;
 
 		auto area = getLocalBounds().reduced(margin * 2);
 
@@ -712,7 +787,17 @@ public:
 		rates_combo.setBounds(area.removeFromTop(height));
 		area.removeFromTop(margin);
 
-		area.removeFromTop(height + margin);		
+		line = area.removeFromTop(height);
+		bpfH_checkbox.setBounds(line.removeFromLeft(60));
+		high_slider.setBounds(line.removeFromLeft(line.getWidth() - (60 + label) - margin * 2));
+		line.removeFromLeft(margin);
+		order_combo.setBounds(line.removeFromLeft(60 + margin));
+		line.removeFromLeft(margin);
+		bpfL_checkbox.setBounds(line);
+		area.removeFromTop(margin);
+
+		area.removeFromTop(height + margin);
+
 		line = area.removeFromTop(height);
 		line.removeFromLeft(label);
 		buff_size_combo.setBounds(line);
@@ -720,8 +805,8 @@ public:
 		line = area.removeFromTop(height);
 		tone_checkbox.setBounds(line.removeFromLeft(label - margin));
 		line.removeFromLeft(margin);
-		tone_combo.setBounds(line);		
-		area.removeFromTop(margin);		
+		tone_combo.setBounds(line);
+		area.removeFromTop(margin);
 
 		area.removeFromLeft(label);
 		auto right = area.removeFromRight(getWidth() / 2);
@@ -738,7 +823,7 @@ public:
 		r_label_value_minmax.setBounds(right.removeFromTop(height));
 		right.removeFromTop(margin);
 		b_label_value_minmax.setBounds(right.removeFromTop(height));
-    }
+	}
 
 	double gain2db(double gain) {
 		return 20 * log10(gain);
@@ -764,10 +849,10 @@ public:
 		return text;
 	}
 
-    void timerCallback() override
+	void timerCallback() override
 	{
-		auto l = _buff_l->get_value();
-		auto r = _buff_r->get_value();
+		auto l = buff[0]->get_value();
+		auto r = buff[1]->get_value();
 		function<String(double)> print;
 
 		auto calibrate = cal_checkbox.getToggleState() && table_cals.selected != -1;
@@ -778,13 +863,13 @@ public:
 			print = prefix_v;
 		}
 		else {
-			l = gain2db(l) - _zero_l;
-			r = gain2db(r) - _zero_r;
+			l = gain2db(l) - zero[0];
+			r = gain2db(r) - zero[1];
 			print = [](double value) { return String(value, 3) + " dB"; };
 		}
 		auto b = abs(l - r);
 
-		auto minmax = [&](double *stat, double val) {
+		auto minmax_r = [&](double *stat, double val) {
 			if (display(String(val, 3)) != "--")
 			{
 				if (stat[0] == 555) stat[0] = val;
@@ -794,22 +879,23 @@ public:
 			}
 		};
 
-		minmax(_l, l);
-		minmax(_r, r);
-		minmax(_b, b);
+		minmax_r(minmax[0], l);
+		minmax_r(minmax[1], r);
+		minmax_r(minmax[2], b);
 
-		display(l_label_value, print(l)); l_label_value_minmax.setText(display(print(_l[0])) + " .. " + display(print(_l[1])), dontSendNotification);
-		display(r_label_value, print(r)); r_label_value_minmax.setText(display(print(_r[0])) + " .. " + display(print(_r[1])), dontSendNotification);
-		display(b_label_value, print(b)); b_label_value_minmax.setText(display(print(_b[0])) + " .. " + display(print(_b[1])), dontSendNotification);
+		display(l_label_value, print(l)); l_label_value_minmax.setText(display(print(minmax[0][0])) + " .. " + display(print(minmax[0][1])), dontSendNotification);
+		display(r_label_value, print(r)); r_label_value_minmax.setText(display(print(minmax[1][0])) + " .. " + display(print(minmax[1][1])), dontSendNotification);
+		display(b_label_value, print(b)); b_label_value_minmax.setText(display(print(minmax[2][0])) + " .. " + display(print(minmax[2][1])), dontSendNotification);
 
-		if (zero_button.isEnabled() == calibrate) zero_button.setEnabled(!calibrate);
+		if (zero_button.isEnabled()       == calibrate) zero_button.setEnabled(!calibrate);
 		if (reset_zero_button.isEnabled() == calibrate) reset_zero_button.setEnabled(!calibrate);
-    }
+	}
 
 private:
-    TextButton zero_button, reset_zero_button, reset_minmax, cal_button;
+	TextButton zero_button, reset_zero_button, reset_minmax, cal_button;
 	TextEditor cal_edit_ch[2], cal_edit_name;
-	ComboBox   types_combo, outputs_combo, rates_combo, buff_size_combo, tone_combo, prefix_combo;
+	ComboBox   types_combo, outputs_combo, rates_combo, buff_size_combo, tone_combo, prefix_combo, order_combo;
+	Slider     high_slider;
 
 	Label
 		buff_size_label { {}, "Buff size"   },
@@ -821,12 +907,27 @@ private:
 		cal_label_ch	{ {}, "Left/Right"  };
 	ToggleButton
 		tone_checkbox   { "Tone"            },
-		cal_checkbox    { "Use Calibration" };	
+		cal_checkbox    { "Use Calibration" },
+		bpfH_checkbox   { "bpfH"            }, bpfL_checkbox { "bpfL" };
 
 	table_cals_ table_cals;
 	sin_        osc;
 
-	theme::checkbox_right_lf theme_right;
+	theme::checkbox_right_text_lf theme_right_text;
+	theme::checkbox_right_lf      theme_right;
+	
+	Random random;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)
+	double zero[2]      = { 0, 0 };
+	double minmax[3][2] = { { 555, 555 }, { 555, 555 }, { 555, 555 } };
+
+	double sample_rate = 0.0;
+	size_t order       = 120;
+
+	unique_ptr<circular_buffer<float>>                           buff[2];
+	unique_ptr<spuce::iir<spuce::float_type, spuce::float_type>> iir[2];
+
+	mutex audio_process;	
+
+	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)
 };
