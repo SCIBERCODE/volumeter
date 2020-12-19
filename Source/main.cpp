@@ -1,66 +1,53 @@
 #include <JuceHeader.h>
+
+using namespace std;
+
 #include "main.h"
-#include "theme.h"
+#include "gui.h"
+//#include "gui_cals.h"
 
-unique_ptr<ApplicationProperties> _settings;
+unique_ptr<settings_> _opt;
 
-class Application : public juce::JUCEApplication
+application_::application_() {
+	_opt = make_unique<settings_>();
+}
+
+application_::~application_() {
+	_opt.reset();
+}
+
+const String application_::getApplicationName()    { return "volumeter";    }
+const String application_::getApplicationVersion() { return "1.0.0";        }
+void application_::shutdown()                      { main_window = nullptr; }
+bool application_::moreThanOneInstanceAllowed()    { return false;          }
+
+void application_::initialise(const String&)
 {
-public:
-	Application()
-	{
-		_settings.reset(new ApplicationProperties());
-		PropertiesFile::Options options;
-		options.applicationName = "volumeter";
-		options.filenameSuffix  = ".xml";
-		options.folderName      = File::getCurrentWorkingDirectory().getFullPathName();
-		options.storageFormat   = PropertiesFile::storeAsXML;
-		_settings->setStorageParameters(options);
-	}
-	~Application() override
-	{
-		_settings.reset();
-	}
+	Desktop::getInstance().setDefaultLookAndFeel(&theme);
+	main_window.reset(new main_window_("volumeter", new main_component_(), *this));
+}
 
-	const juce::String getApplicationName() override    { return "volumeter";   }
-	const juce::String getApplicationVersion() override { return "1.0.0";       }
-	void shutdown() override                            { mainWindow = nullptr; }
+String prefix(double value, String unit, size_t numder_of_decimals)
+{
+	auto   symbol = String();
+	double new_value = value;
 
-	void initialise (const juce::String&) override
+	auto exp = (int)(floor(log10(value) / 3.0) * 3.0);
+	if (_prefs.count(exp))
 	{
-		Desktop::getInstance().setDefaultLookAndFeel(&theme);
-		mainWindow.reset(new MainWindow ("volumeter", new MainContentComponent, *this));
-	}
-
-private:
-	class MainWindow : public juce::DocumentWindow
-	{
-	public:
-		MainWindow (const juce::String& name, juce::Component* c, JUCEApplication& a)
-			: DocumentWindow(name, theme::grey_level(239), juce::DocumentWindow::allButtons), app(a)
+		symbol = _prefs.at(exp);
+		new_value = value * pow(10.0, -exp);
+		if (new_value >= 1000.0)
 		{
-			setUsingNativeTitleBar(false);
-			setTitleBarTextCentred(true);
-			setResizable(true, false);
-			setContentOwned (c, true);
-			setResizeLimits (300, 250, 10000, 10000);
-			centreWithSize (getWidth(), getHeight());
-			setVisible (true);
-			toFront(true);
+			new_value /= 1000.0;
+			exp += 3;
 		}
+	}
+	return String(new_value, (int)numder_of_decimals) + " " + symbol + unit;
+}
 
-		void closeButtonPressed() override
-		{
-			app.systemRequestedQuit();
-		}
+String prefix_v(double value) {
+	return prefix(value, "V", 5);
+}
 
-	private:
-		JUCEApplication& app;
-
-		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
-	};
-	std::unique_ptr<MainWindow> mainWindow;
-	theme::light theme;
-};
-
-START_JUCE_APPLICATION (Application)
+START_JUCE_APPLICATION(application_)

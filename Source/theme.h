@@ -1,35 +1,19 @@
 #pragma once
+#include <JuceHeader.h>
+
 namespace theme
 {
-	enum color_ids {
-		plot_background,
-		plot_bars,
-		plot_text_dark,
-		plot_graph,
-		plot_graph_missed,
-		plot_axiliary,
-		plot_png_text,
-		plot_png_background,
-
-		marker_scan,
-		outline,
-	};
-
 	static auto grey_level(uint8_t level) {
 		return Colour::greyLevel(jmap((float)level, 0.0f, 256.0f, 0.0f, 1.0f));
 	}
 
-	class light : public LookAndFeel_V4 {
+	class light_ : public LookAndFeel_V4 {
 	private:
 		const Colour white   = grey_level(255);
-		const Colour lighter = grey_level(225);
-		const Colour base    = grey_level(184);
 		const Colour outline = grey_level(135);
-		const Colour dark    = grey_level(113);
-		const Colour darker  = grey_level(83);
 		const Colour black   = grey_level(0);
 	public:
-		light() {
+		light_() {
 			auto scheme = getLightColourScheme();
 			scheme.setUIColour(ColourScheme::outline, outline);
 			scheme.setUIColour(ColourScheme::UIColour::defaultText, black);
@@ -37,19 +21,7 @@ namespace theme
 
 			setColour(TextEditor::ColourIds::textColourId, black);
 			setColour(TextEditor::ColourIds::highlightedTextColourId, black);
-
-			setColour(color_ids::plot_background, white);
-			setColour(color_ids::plot_bars, lighter);
-			setColour(color_ids::plot_text_dark, darker);
-			setColour(color_ids::plot_graph, black);
-			setColour(color_ids::plot_graph_missed, Colours::red.withAlpha(0.6f));
-			setColour(color_ids::plot_axiliary, outline);
-			setColour(color_ids::plot_png_text, black);
-			setColour(color_ids::plot_png_background, white);
-
-			setColour(color_ids::marker_scan, base);
-			setColour(color_ids::outline, outline);
-
+			setColour(Slider::textBoxBackgroundColourId, white);
 			setColour(ResizableWindow::backgroundColourId, grey_level(239));
 		}
 
@@ -62,6 +34,10 @@ namespace theme
 
 		Font getComboBoxFont(ComboBox &) {
 			return Font(13.5f);
+		}
+
+		Font getLabelFont(Label &label) {
+			return label.getFont().withHeight(14.0f);
 		}
 
 		void drawToggleButton(Graphics& g, ToggleButton& button,
@@ -91,7 +67,9 @@ namespace theme
 		}
 	};
 
-	class checkbox_right_text_lf : public light
+	//=========================================================================================
+	class checkbox_right_text_lf_ : public light_
+	//=========================================================================================
 	{
 	public:
 		void drawToggleButton(Graphics& g, ToggleButton& button,
@@ -108,7 +86,8 @@ namespace theme
 				shouldDrawButtonAsDown);
 
 			g.setColour(button.findColour(ToggleButton::textColourId));
-			g.setFont(fontSize);
+			Font font(14.0f);
+			g.setFont(button.getToggleState() ? font.boldened() : font);
 
 			if (!button.isEnabled())
 				g.setOpacity(0.5f);
@@ -120,7 +99,9 @@ namespace theme
 		}
 	};
 
-	class checkbox_right_lf : public light
+	//=========================================================================================
+	class checkbox_right_lf_ : public light_
+	//=========================================================================================
 	{
 	public:
 		void drawToggleButton(Graphics& g, ToggleButton& button,

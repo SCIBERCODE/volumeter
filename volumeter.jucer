@@ -5,8 +5,11 @@
               cppLanguageStandard="17" displaySplashScreen="0" headerPath="..\..\Libs\asio_sdk\common\&#10;..\..\Libs\">
   <MAINGROUP id="US7HFq" name="volumeter">
     <GROUP id="{4D1FF0D6-F97F-78FF-33FC-9D81D7CAB011}" name="Source">
+      <FILE id="FYAWgD" name="gui.h" compile="0" resource="0" file="Source/gui.h"/>
+      <FILE id="qEaw0o" name="gui_cals.h" compile="0" resource="0" file="Source/gui_cals.h"/>
       <FILE id="FOprC1" name="main.cpp" compile="1" resource="0" file="Source/main.cpp"/>
       <FILE id="GuKL11" name="main.h" compile="0" resource="0" file="Source/main.h"/>
+      <FILE id="xcce8E" name="signal.h" compile="0" resource="0" file="Source/signal.h"/>
       <FILE id="owFCqK" name="theme.h" compile="0" resource="0" file="Source/theme.h"/>
     </GROUP>
   </MAINGROUP>
@@ -31,6 +34,7 @@
         <MODULEPATH id="juce_graphics" path="../../audio/juce/modules"/>
         <MODULEPATH id="juce_gui_basics" path="../../audio/juce/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../audio/juce/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../audio/juce/modules"/>
       </MODULEPATHS>
     </VS2017>
   </EXPORTFORMATS>
@@ -42,6 +46,7 @@
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
     <MODULE id="juce_events" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
     <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
