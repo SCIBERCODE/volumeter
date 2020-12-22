@@ -4,7 +4,6 @@ using namespace std;
 
 #include "main.h"
 #include "gui.h"
-//#include "gui_cals.h"
 
 unique_ptr<settings_> _opt;
 

@@ -65,7 +65,7 @@ public:
 		addAndMakeVisible(buff_size_label);
 		buff_size_label.attachToComponent(&buff_size_combo, true);
 		for (auto const item : buff_size_list)
-			buff_size_combo.addItem(prefix(item, "s", 0), (int)(item * 1000));
+			buff_size_combo.addItem(prefix(item, "s", 0), static_cast<int>(item * 1000));
 
 		buff_size_combo.setSelectedId(_opt->load_int("buff_size"));
 		buff_size_combo.onChange = [this]
@@ -73,25 +73,19 @@ public:
 			auto val = buff_size_combo.getSelectedId();
 			signal.change_buff_size(val);
 			_opt->save("buff_size", val);
-		};		
+		};
 
-		addAndMakeVisible(l_label_value); addAndMakeVisible(l_label_value_minmax);
-		addAndMakeVisible(l_label);
-		l_label.attachToComponent(&l_label_value, true);
-		l_label_value.setFont(l_label_value.getFont().boldened());
-		l_label_value_minmax.setJustificationType(Justification::right);
-
-		addAndMakeVisible(r_label_value); addAndMakeVisible(r_label_value_minmax);
-		addAndMakeVisible(r_label);
-		r_label.attachToComponent(&r_label_value, true);
-		r_label_value.setFont(r_label_value.getFont().boldened());
-		r_label_value_minmax.setJustificationType(Justification::right);
-
-		addAndMakeVisible(b_label_value); addAndMakeVisible(b_label_value_minmax);
-		addAndMakeVisible(balance_label);
-		balance_label.attachToComponent(&b_label_value, true);
-		b_label_value.setFont(b_label_value.getFont().boldened());
-		b_label_value_minmax.setJustificationType(Justification::right);
+		const array<String, 3> stat_captions = { "Left", "Right", "Balance" };
+		for (size_t line = 0; line < 3; line++)	{
+			for (size_t col = 0; col < 3; col++)
+			{
+				labels_stat.at(line).at(col).reset(new Label({}, col == 0 ? stat_captions.at(line) : String()));
+				addAndMakeVisible(labels_stat.at(line).at(col).get());
+			}
+			labels_stat.at(line).at(0)->attachToComponent(labels_stat.at(line).at(1).get(), true);
+			labels_stat.at(line).at(1)->setFont(labels_stat.at(line).at(1)->getFont().boldened());
+			labels_stat.at(line).at(2)->setJustificationType(Justification::right);
+		}
 
 		const OwnedArray<AudioIODeviceType>& types = deviceManager.getAvailableDeviceTypes();
 
@@ -186,8 +180,9 @@ public:
 		high_slider.setSliderStyle(Slider::LinearHorizontal);
 		high_slider.setTextBoxStyle(Slider::TextBoxRight, false, 60, 20);
 		high_slider.setRange(20, 20000, 1);
-		high_slider.setValue(15000, dontSendNotification);
+		high_slider.setValue(_opt->load_int("bpfL_value", "15000"), dontSendNotification);
 		high_slider.onDragEnd = [this] {
+			_opt->save("bpfL_value", high_slider.getValue());
 			signal.filter_init();
 		};
 
@@ -225,6 +220,9 @@ public:
 	{
 		buff_size_combo.onChange();
 		signal.prepare_to_play(sample_rate);
+
+		high_slider.setRange(20, sample_rate / 2, 1);
+		high_slider.repaint();
 	}
 
 	void getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill) override
@@ -234,75 +232,71 @@ public:
 
 	void resized() override
 	{
-		auto area = getLocalBounds().reduced(_s::margin * 2);
+		auto area = getLocalBounds().reduced(_magic::margin * 2);
 
-		area.removeFromBottom(_s::margin);
+		area.removeFromBottom(_magic::margin);
 		calibrations_component.setBounds(area.removeFromBottom(280));
-		area.removeFromBottom(_s::height);
+		area.removeFromBottom(_magic::height);
 
-		area.removeFromBottom(_s::margin);
-		reset_minmax.setBounds(area.removeFromBottom(_s::height));
-		area.removeFromBottom(_s::margin);
-		reset_zero_button.setBounds(area.removeFromBottom(_s::height));
-		area.removeFromBottom(_s::margin);
-		zero_button.setBounds(area.removeFromBottom(_s::height));
-		area.removeFromBottom(_s::margin);
+		area.removeFromBottom(_magic::margin);
+		reset_minmax.setBounds(area.removeFromBottom(_magic::height));
+		area.removeFromBottom(_magic::margin);
+		reset_zero_button.setBounds(area.removeFromBottom(_magic::height));
+		area.removeFromBottom(_magic::margin);
+		zero_button.setBounds(area.removeFromBottom(_magic::height));
+		area.removeFromBottom(_magic::margin);
 
-		types_combo.setBounds(area.removeFromTop(_s::height));
-		area.removeFromTop(_s::margin);
-		outputs_combo.setBounds(area.removeFromTop(_s::height));
-		area.removeFromTop(_s::margin);
-		rates_combo.setBounds(area.removeFromTop(_s::height));
-		area.removeFromTop(_s::margin);
+		types_combo.setBounds(area.removeFromTop(_magic::height));
+		area.removeFromTop(_magic::margin);
+		outputs_combo.setBounds(area.removeFromTop(_magic::height));
+		area.removeFromTop(_magic::margin);
+		rates_combo.setBounds(area.removeFromTop(_magic::height));
+		area.removeFromTop(_magic::margin);
 
-		auto line = area.removeFromTop(_s::height);
+		auto line = area.removeFromTop(_magic::height);
 		bpfH_checkbox.setBounds(line.removeFromLeft(60));
-		high_slider.setBounds(line.removeFromLeft(line.getWidth() - (60 + _s::label) - _s::margin * 2));
-		line.removeFromLeft(_s::margin);
-		order_combo.setBounds(line.removeFromLeft(60 + _s::margin));
-		line.removeFromLeft(_s::margin);
+		high_slider.setBounds(line.removeFromLeft(line.getWidth() - (60 + _magic::label) - _magic::margin * 2));
+		line.removeFromLeft(_magic::margin);
+		order_combo.setBounds(line.removeFromLeft(60 + _magic::margin));
+		line.removeFromLeft(_magic::margin);
 		bpfL_checkbox.setBounds(line);
-		area.removeFromTop(_s::margin);
+		area.removeFromTop(_magic::margin);
 
-		area.removeFromTop(_s::height + _s::margin);
+		area.removeFromTop(_magic::height + _magic::margin);
 
-		line = area.removeFromTop(_s::height);
-		line.removeFromLeft(_s::label);
+		line = area.removeFromTop(_magic::height);
+		line.removeFromLeft(_magic::label);
 		buff_size_combo.setBounds(line);
-		area.removeFromTop(_s::margin);
-		line = area.removeFromTop(_s::height);
-		tone_checkbox.setBounds(line.removeFromLeft(_s::label - _s::margin));
-		line.removeFromLeft(_s::margin);
+		area.removeFromTop(_magic::margin);
+		line = area.removeFromTop(_magic::height);
+		tone_checkbox.setBounds(line.removeFromLeft(_magic::label - _magic::margin));
+		line.removeFromLeft(_magic::margin);
 		tone_combo.setBounds(line);
-		area.removeFromTop(_s::margin);
+		area.removeFromTop(_magic::margin);
 
-		area.removeFromLeft(_s::label);
+		area.removeFromLeft(_magic::label);
 		auto right = area.removeFromRight(getWidth() / 2);
-		right.removeFromRight(_s::margin * 2);
+		right.removeFromRight(_magic::margin * 2);
 
-		l_label_value.setBounds(area.removeFromTop(_s::height));
-		area.removeFromTop(_s::margin);
-		r_label_value.setBounds(area.removeFromTop(_s::height));
-		area.removeFromTop(_s::margin);
-		b_label_value.setBounds(area.removeFromTop(_s::height));
-
-		l_label_value_minmax.setBounds(right.removeFromTop(_s::height));
-		right.removeFromTop(_s::margin);
-		r_label_value_minmax.setBounds(right.removeFromTop(_s::height));
-		right.removeFromTop(_s::margin);
-		b_label_value_minmax.setBounds(right.removeFromTop(_s::height));
-
+		for (size_t k = 0; k < 3; k++) {
+			labels_stat.at(k).at(1)->setBounds(area.removeFromTop(_magic::height));
+			if (k < 2) area.removeFromTop(_magic::margin);
+		}
+		for (size_t k = 0; k < 3; k++) {
+			labels_stat.at(k).at(2)->setBounds(right.removeFromTop(_magic::height));
+			if (k < 2) right.removeFromTop(_magic::margin);
+		}
 	}
 
-	void display(Label &lbl, String text) {
+	void display(Label* label, String text) {
 		if (text.contains("inf") || text.contains("nan"))
 		{
-			lbl.setText("--", dontSendNotification);
-			lbl.setColour(Label::ColourIds::textColourId, Colours::grey);
+			label->setText("--", dontSendNotification);
+			label->setColour(Label::ColourIds::textColourId, Colours::grey);
 		}
 		else {
-			lbl.setText(text, dontSendNotification);
-			lbl.setColour(Label::ColourIds::textColourId, Colours::black);
+			label->setText(text, dontSendNotification);
+			label->setColour(Label::ColourIds::textColourId, Colours::black);
 		}
 	}
 
@@ -336,12 +330,13 @@ public:
 		for (size_t k = 0; k < 3; k++) {
 			if (display(String(lrb[k], 3)) != "--")
 			{
-				if (signal.stat.minmax[k][0] == 555) signal.stat.minmax[k][0] = lrb[k];
-				if (signal.stat.minmax[k][1] == 555) signal.stat.minmax[k][1] = lrb[k];
+				if (signal.stat.minmax[k][0] == _magic::fill) signal.stat.minmax[k][0] = lrb[k];
+				if (signal.stat.minmax[k][1] == _magic::fill) signal.stat.minmax[k][1] = lrb[k];
 				signal.stat.minmax[k][0] = min(signal.stat.minmax[k][0], lrb[k]); // bug: на вольтах при переключении нижняя граница не похожа на правду
 				signal.stat.minmax[k][1] = max(signal.stat.minmax[k][1], lrb[k]);
 			}
-			display(l_label_value, print(lrb[k])); l_label_value_minmax.setText(display(print(signal.stat.minmax[k][0])) + " .. " + display(print(signal.stat.minmax[k][1])), dontSendNotification);
+			display(labels_stat.at(k).at(1).get(), print(lrb[k]));
+			labels_stat.at(k).at(2)->setText(display(print(signal.stat.minmax[k][0])) + " .. " + display(print(signal.stat.minmax[k][1])), dontSendNotification);
 		}
 
 		if (zero_button.isEnabled()       == calibrate) zero_button.setEnabled(!calibrate);
@@ -356,15 +351,15 @@ private:
 	ComboBox   types_combo, outputs_combo, rates_combo, buff_size_combo, tone_combo, order_combo;
 	Slider     high_slider;
 
+	array <array<unique_ptr<Label>, 3>, 3> labels_stat;
+
 	Label
-		buff_size_label { {}, "Buff size"   },
-		cal_label       { {}, "Cal"         },
-		l_label         { {}, "Left"        }, l_label_value, l_label_value_minmax,
-		r_label         { {}, "Right"       }, r_label_value, r_label_value_minmax,
-		balance_label   { {}, "Balance"     }, b_label_value, b_label_value_minmax;
+		buff_size_label { {}, "Buff size" },
+		cal_label       { {}, "Cal"       };
 	ToggleButton
-		tone_checkbox   { "Tone"            },
-		bpfH_checkbox   { "bpfH"            }, bpfL_checkbox { "bpfL" };
+		tone_checkbox   { "Tone"          },
+		bpfH_checkbox   { "bpfH"          },
+		bpfL_checkbox   { "bpfL"          };
 
 	theme::checkbox_right_text_lf_ theme_right_text;
 	theme::checkbox_right_lf_      theme_right;

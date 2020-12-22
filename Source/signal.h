@@ -2,7 +2,6 @@
 #include <JuceHeader.h>
 #include <spuce/filters/iir.h>
 #include <spuce/filters/butterworth_iir.h>
-
 #include "main.h"
 
 extern unique_ptr<settings_> _opt;
@@ -13,9 +12,10 @@ class sin_
 {
 public:
 	sin_() : sampling_rate(44100.0),
-		angle(0.0),
-		angle_delta(0.0),
-		freq(0.0) { }
+			 angle(0.0),
+			 angle_delta(0.0),
+			 freq(0.0) 
+	{ }
 
 	void set_sample_rate(double sample_rate) {
 		sampling_rate = sample_rate;
@@ -35,7 +35,6 @@ public:
 	}
 
 private:
-
 	double sampling_rate, freq, angle_delta, angle;
 };
 
@@ -44,17 +43,19 @@ template <class T> class circle_ {
 //=========================================================================================
 private:
 	unique_ptr<T[]> buffer;
-	size_t          head = 0;
-	size_t          tail = 0;
+	size_t          head;
+	size_t          tail;
 	size_t          max_size;
 	T               empty_item;
 public:
 	void clear() {
 		for (size_t k = 0; k < max_size; k++)
-			buffer[k] = 555;
+			buffer[k] = _magic::fill;
 	}
-	circle_<T>(size_t max_size)
-		: buffer(unique_ptr<T[]>(new T[max_size])), max_size(max_size)
+	circle_<T>(size_t max_size) : buffer(unique_ptr<T[]>(new T[max_size])),
+								  max_size(max_size),
+								  head(0),
+								  tail(0)
 	{
 		//std::generate(std::begin(buffer), std::end(buffer), [] { return 0; });
 		clear();
@@ -69,13 +70,13 @@ public:
 
 	double get_value()
 	{
-		double sum = 0.0;
+		double sum  = 0.0;
 		size_t size = 0;
 
 		for (size_t k = 0; k < max_size; ++k)
 		{
 			auto sample = buffer[k];
-			if (sample != 555 && sample) {
+			if (sample != _magic::fill && sample) {
 				sum += sample;
 				size++;
 			}
@@ -104,8 +105,8 @@ public:
 		stat.clear_stat();
 	}
 	void reset_zero() {
-		stat.zero[0] = 0;
-		stat.zero[1] = 0;
+		stat.zero[0] = 0.0;
+		stat.zero[1] = 0.0;
 		clear_stat();
 	}
 	double gain2db(double gain) {
@@ -139,23 +140,22 @@ public:
 
 	void filter_init()
 	{
-		/*{
-			lock_guard<mutex> locker(audio_process);
-
+		lock_guard<mutex> locker(audio_process);
+		for (size_t ch = 0; ch < 2; ++ch)
+		{
 			if (_opt->load_int("use_bpfH", "0"))
 			{
 				spuce::iir_coeff bpfH(order, spuce::filter_type::high);
 				spuce::butterworth_iir(bpfH, 20.0 / sample_rate, 3.0);
-				iir[0].reset(new spuce::iir<spuce::float_type, spuce::float_type>(bpfH));
+				iir[ch][0].reset(new spuce::iir<spuce::float_type, spuce::float_type>(bpfH));
 			}
 			if (_opt->load_int("use_bpfL", "0"))
 			{
 				spuce::iir_coeff bpfL(order, spuce::filter_type::low);
-				spuce::butterworth_iir(bpfL, high_slider.getValue() / sample_rate, 3.0);
-				iir[1].reset(new spuce::iir<spuce::float_type, spuce::float_type>(bpfL));
+				spuce::butterworth_iir(bpfL, _opt->load_int("bpfL_value", "15000") / sample_rate, 3.0);
+				iir[ch][1].reset(new spuce::iir<spuce::float_type, spuce::float_type>(bpfL));
 			}
 		}
-		high_slider.repaint();*/
 	};
 
 	void prepare_to_play(double sample_rate_)
@@ -166,78 +166,78 @@ public:
 		osc.set_freq(static_cast<float>(_opt->load_int("tone_value")));
 		osc.reset();
 
-		//filter_init();
+		filter_init();
 	}
 
-	void next_audio_block(const AudioSourceChannelInfo& bufferToFill)
+	void next_audio_block(const AudioSourceChannelInfo& buffer)
 	{
-		auto r = bufferToFill.buffer->getArrayOfReadPointers();
-		auto w = bufferToFill.buffer->getArrayOfWritePointers();
+		auto r = buffer.buffer->getArrayOfReadPointers();
+		auto w = buffer.buffer->getArrayOfWritePointers();
 
-		for (int sample_idx = 0; sample_idx < bufferToFill.numSamples; ++sample_idx)
+		for (auto sample_idx = 0; sample_idx < buffer.numSamples; ++sample_idx)
 		{
 			if (r[0][sample_idx]) buff[0]->enqueue(r[0][sample_idx]);
 			if (r[1][sample_idx]) buff[1]->enqueue(r[1][sample_idx]);
 		}
 
-		if (_opt->load_int("tone"))
+		if (_opt->load_int("tone", "0"))
 		{
-			for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
+			for (auto sample = 0; sample < buffer.numSamples; ++sample)
 			{
 				auto tone_sample = osc.sample();
 				w[0][sample] = tone_sample;
 				w[1][sample] = tone_sample;
 			}
 		}
-		/*else {
+		else {
+			auto use_bpfH = false,
+				 use_bpfL = false;
+
 			if (audio_process.try_lock())
 			{
-				auto use_bpfH = bpfH_checkbox.getToggleState() && iir[0];
-				auto use_bpfL = bpfL_checkbox.getToggleState() && iir[1];
+				use_bpfH = _opt->load_int("use_bpfH", "0") && iir[0];
+				use_bpfL = _opt->load_int("use_bpfL", "0") && iir[1];
 
 				if (use_bpfH || use_bpfL)
-				{
-					for (size_t ch = 0; ch < 2; ++ch) {
-						for (int sample_idx = 0; sample_idx < bufferToFill.numSamples; ++sample_idx)
+					for (size_t ch = 0; ch < 2; ++ch)
+						for (auto sample_idx = 0; sample_idx < buffer.numSamples; ++sample_idx)
 						{
-							spuce::float_type sample = r[ch][sample_idx]; // random.nextFloat();
-							if (use_bpfH) sample = iir[0]->clock(sample);
-							if (use_bpfL) sample = iir[1]->clock(sample);
-							w[ch][sample_idx] = (float)sample;
+							spuce::float_type sample = r[ch][sample_idx];
+							if (use_bpfH) sample = iir[ch][0]->clock(sample);
+							if (use_bpfL) sample = iir[ch][1]->clock(sample);
+							w[ch][sample_idx] = static_cast<float>(sample);
 						}
-						if (use_bpfH) iir[0]->reset();
-						if (use_bpfL) iir[1]->reset();
-					}
-				}
+
 				audio_process.unlock();
 			}
-		}*/
-		else bufferToFill.clearActiveBufferRegion();
+			if (!use_bpfH && !use_bpfL)
+				buffer.clearActiveBufferRegion();
+		}
 	}	
 
 protected:
 
 	struct stat_t {
-		double zero[2] = { 0, 0 };
-		double minmax[3][2] = { { 555, 555 }, { 555, 555 }, { 555, 555 } };
+		double zero[2] = { 0.0, 0.0 };
+		double minmax[3][2] = { { _magic::fill, _magic::fill }, { _magic::fill, _magic::fill }, { _magic::fill, _magic::fill } };
 
 		void clear_stat() {
 			for (size_t k = 0; k < 3; k++) {
-				minmax[k][0] = 555;
-				minmax[k][1] = 555;
+				minmax[k][0] = _magic::fill;
+				minmax[k][1] = _magic::fill;
 			}
 		}
 	};
 
 public:
-	stat_t       stat;
+	stat_t stat;
 private:
-	double       sample_rate;
-	size_t       order;
-	mutex        audio_process;
-	sin_         osc;
+	double sample_rate;
+	size_t order;
+	mutex  audio_process;
+	sin_   osc;
 
 	unique_ptr<circle_<float>>                                   buff[2];
-	unique_ptr<spuce::iir<spuce::float_type, spuce::float_type>> iir[2];
+	unique_ptr<spuce::iir<spuce::float_type, spuce::float_type>> iir[2][2];
 
 };

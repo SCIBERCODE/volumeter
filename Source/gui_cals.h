@@ -82,9 +82,7 @@ public:
 			e->setAttribute("right",      ch[1]);
 			e->setAttribute("right_coef", ch[1] / lrb.at(1)); // todo: check for nan
 
-			//_settings->getUserSettings()->setValue("calibrations", cals.get());
-			//_settings->saveIfNeeded();
-			//_opt->save("calibrations", cals.get());//#
+			_opt->save("calibrations", move(cals));
 			update();
 		};
 	}
@@ -98,10 +96,6 @@ public:
 	void update()
 	{
 		rows.clear();
-		/*cal_edit_name.setText(String());
-		cal_edit_ch[0].setText(String());
-		cal_edit_ch[1].setText(String());*/
-
 		auto cals = _opt->load_xml("calibrations");
 		if (cals != nullptr) {
 			forEachXmlChildElement(*cals, el)
@@ -115,7 +109,6 @@ public:
 				});
 			}
 		}
-
 		selected = _opt->load_int("cal_index", "-1");
 		table.updateContent();
 	};
@@ -180,23 +173,23 @@ public:
 
 	void resized() override {
 		auto area = getLocalBounds();
-		area.removeFromBottom(_s::margin);
-		auto bottom = area.removeFromBottom(_s::height * 2 + _s::margin);
-		cal_button.setBounds(bottom.removeFromRight(_s::label).withTrimmedLeft(_s::margin));
-		auto line = bottom.removeFromBottom(_s::height);
-		line.removeFromLeft(_s::label);
-		int edit_width = (line.getWidth() - _s::label) / 2;
+		area.removeFromBottom(_magic::margin);
+		auto bottom = area.removeFromBottom(_magic::height * 2 + _magic::margin);
+		cal_button.setBounds(bottom.removeFromRight(_magic::label).withTrimmedLeft(_magic::margin));
+		auto line = bottom.removeFromBottom(_magic::height);
+		line.removeFromLeft(_magic::label);
+		int edit_width = (line.getWidth() - _magic::label) / 2;
 		cal_edit_ch[0].setBounds(line.removeFromLeft(edit_width));
-		line.removeFromLeft(_s::margin);
+		line.removeFromLeft(_magic::margin);
 		cal_edit_ch[1].setBounds(line.removeFromLeft(edit_width));
-		line.removeFromLeft(_s::margin);
+		line.removeFromLeft(_magic::margin);
 		prefix_combo.setBounds(line);
-		bottom.removeFromBottom(_s::margin);
-		bottom.removeFromLeft(_s::label);
-		cal_edit_name.setBounds(bottom.removeFromBottom(_s::height));
-		area.removeFromBottom(_s::margin);
-		cal_checkbox.setBounds(area.removeFromTop(_s::height));
-		area.removeFromTop(_s::margin);
+		bottom.removeFromBottom(_magic::margin);
+		bottom.removeFromLeft(_magic::label);
+		cal_edit_name.setBounds(bottom.removeFromBottom(_magic::height));
+		area.removeFromBottom(_magic::margin);
+		cal_checkbox.setBounds(area.removeFromTop(_magic::height));
+		area.removeFromTop(_magic::margin);
 		table.setBounds(area);
 	}
 
@@ -247,8 +240,7 @@ public:
 			e->setAttribute("right",      row.ch[1]);
 			e->setAttribute("right_coef", row.ch_coef[1]);
 		}
-		//_settings->getUserSettings()->setValue("calibrations", cals.get());//#
-		//_settings->saveIfNeeded();
+		_opt->save("calibrations", move(cals));
 	}
 
 //=========================================================================================

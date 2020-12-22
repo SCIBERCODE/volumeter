@@ -3,10 +3,11 @@
 #include <memory>
 #include "theme.h"
 
-namespace _s {
+namespace _magic {
 	const size_t height = 20;
 	const size_t margin = 5;
 	const size_t label  = 75;
+	const double fill   = 555.0;
 }
 
 const map<int, String> _prefs = {
@@ -82,8 +83,14 @@ public:
 		options.storageFormat   = PropertiesFile::storeAsXML;
 		settings.setStorageParameters(options);
 	}
+
 	void save(const String& key, const var& value) {
 		settings.getUserSettings()->setValue(key, value);
+		settings.saveIfNeeded();
+	}
+
+	void save(const String& key, unique_ptr<XmlElement> xml) {
+		settings.getUserSettings()->setValue(key, xml.get());
 		settings.saveIfNeeded();
 	}
 
@@ -98,6 +105,7 @@ public:
 	auto load_xml(const String& key) {
 		return settings.getUserSettings()->getXmlValue(key);
 	}
+
 private:
 	ApplicationProperties settings;
 };
