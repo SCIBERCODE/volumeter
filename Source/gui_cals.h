@@ -5,7 +5,7 @@
 extern unique_ptr<settings_> _opt;
 
 class calibrations_component_ : public Component,
-                                public TableListBoxModel
+								public TableListBoxModel
 {
 public:
 
@@ -290,8 +290,8 @@ protected:
 
 	private:
 		calibrations_component_& owner;
-		TextButton				 button;
-		int						 row;
+		TextButton               button;
+		int                      row;
 	};
 
 //=========================================================================================
@@ -308,7 +308,7 @@ private:
 	TextButton    cal_button;
 	Label         cal_label_add { {}, "Name"            },
 	              cal_label_ch  { {}, "Left/Right"      };
-	ToggleButton  cal_checkbox  {     "Use Calibration" };	
+	ToggleButton  cal_checkbox  {     "Use Calibration" };
 
 	String getAttributeNameForColumnId(const int columnId) const
 	{

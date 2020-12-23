@@ -80,14 +80,13 @@ protected:
 	};
 
 	const map<String, option> options = {
-        { "checkbox_bpfH",    { "use_bpfH",   "0"     } },
-        { "checkbox_bpfL",    { "use_bpfL",   "0"     } },
-        { "slider_freq_high", { "bpfL_value", "15000" } },
-        { "combo_order",      { "order",      "120"   } },
-        { "combo_buff_size",  { "buff_size",  "500"   } },
-        { "checkbox_tone",    { "tone",       "0"     } },
-        { "combo_tone",       { "tone_value", "1000"  } }
-
+		{ "checkbox_bpfH",    { "use_bpfH",   "0"     } },
+		{ "checkbox_bpfL",    { "use_bpfL",   "0"     } },
+		{ "slider_freq_high", { "bpfL_value", "15000" } },
+		{ "combo_order",      { "order",      "120"   } },
+		{ "combo_buff_size",  { "buff_size",  "500"   } },
+		{ "checkbox_tone",    { "tone",       "0"     } },
+		{ "combo_tone",       { "tone_value", "1000"  } }
 	};
 
 public:
@@ -115,26 +114,26 @@ public:
 		return load_str(key, default_value).getIntValue();
 	}
 
-    template <typename T>
-    void save_(const String& component_name, T value) {
-        if (options.count(component_name) > 0) {
-            settings.getUserSettings()->setValue(options.at(component_name).xml_name, value);
-            settings.saveIfNeeded();
-        }
-    }
+	template <typename T>
+	void save_(const String& component_name, T value) {
+		if (options.count(component_name) > 0) {
+			settings.getUserSettings()->setValue(options.at(component_name).xml_name, value);
+			settings.saveIfNeeded();
+		}
+	}
 
 	String load_text(const String& component_name) {
 		if (options.count(component_name) == 0)
 			return String();
 		else
 			return settings.getUserSettings()->getValue(
-				options.at(component_name).xml_name, 
+				options.at(component_name).xml_name,
 				options.at(component_name).default_value
 			);
 	}
 
 	int load_int_(const String& component_name) {
-		if (options.count(component_name) == 0) 
+		if (options.count(component_name) == 0)
 			return 0;
 		else
 			return load_text(component_name).getIntValue();
@@ -147,4 +146,3 @@ public:
 private:
 	ApplicationProperties settings;
 };
-

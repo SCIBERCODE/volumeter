@@ -119,7 +119,7 @@ namespace theme
 
 			g.drawFittedText(button.getButtonText(),
 				button.getLocalBounds().withTrimmedRight(6 + (int)tickWidth),
-				Justification::centredRight, 10);		
+				Justification::centredRight, 10);
 
 			//font.getStringWidth(button.getButtonText())
 			drawTickBox(g, button, button.getWidth() - tickWidth, (button.getHeight() - tickWidth) * 0.5f,
