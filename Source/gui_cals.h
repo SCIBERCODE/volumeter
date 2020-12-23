@@ -53,8 +53,7 @@ public:
 		prefix_combo.setSelectedId(_opt->load_int("pref", "0") + 1);
 		prefix_combo.onChange = [this]
 		{
-			auto val = prefix_combo.getSelectedId();
-			_opt->save("pref", val - 1);
+			_opt->save("pref", prefix_combo.getSelectedId() - 1);
 		};
 
 		cal_button.setButtonText("Add");
@@ -82,7 +81,7 @@ public:
 			e->setAttribute("right",      ch[1]);
 			e->setAttribute("right_coef", ch[1] / lrb.at(1)); // todo: check for nan
 
-			_opt->save("calibrations", move(cals));
+			_opt->save("calibrations", cals.get());
 			update();
 		};
 	}
@@ -208,7 +207,7 @@ public:
 		return nullptr;
 	}
 
-	void delete_row(int del_row) 
+	void delete_row(int del_row)
 	{
 		rows.erase(rows.begin() + del_row);
 
@@ -231,7 +230,7 @@ public:
 		}
 		cals->deleteAllChildElements();
 
-		for (auto row : rows)
+		for (const auto& row : rows)
 		{
 			auto* e = cals->createNewChildElement("ROW");
 			e->setAttribute("name",       row.name);
@@ -240,7 +239,7 @@ public:
 			e->setAttribute("right",      row.ch[1]);
 			e->setAttribute("right_coef", row.ch_coef[1]);
 		}
-		_opt->save("calibrations", move(cals));
+		_opt->save("calibrations", cals.get());
 	}
 
 //=========================================================================================

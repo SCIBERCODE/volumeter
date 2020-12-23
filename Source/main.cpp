@@ -18,7 +18,7 @@ application_::~application_() {
 const String application_::getApplicationName()    { return "volumeter";    }
 const String application_::getApplicationVersion() { return "1.0.0";        }
 void application_::shutdown()                      { main_window = nullptr; }
-bool application_::moreThanOneInstanceAllowed()    { return false;          }
+bool application_::moreThanOneInstanceAllowed()    { return true;           }
 
 void application_::initialise(const String&)
 {
