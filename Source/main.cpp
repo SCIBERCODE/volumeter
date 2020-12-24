@@ -23,7 +23,7 @@ bool application_::moreThanOneInstanceAllowed()    { return true;           }
 void application_::initialise(const String&)
 {
 	Desktop::getInstance().setDefaultLookAndFeel(&theme);
-	main_window.reset(new main_window_("volumeter", new main_component_(), *this));
+	main_window = make_unique<main_window_>("volumeter", new main_component_(), *this);
 }
 
 String prefix(double value, String unit, size_t numder_of_decimals)

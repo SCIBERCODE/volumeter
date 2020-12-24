@@ -16,7 +16,7 @@ public:
 		cal_checkbox.onClick = [this]
 		{
 			_opt->save("calibrate", cal_checkbox.getToggleState());
-			signal.clear_stat(); // todo: сохранять статистику, переводя в вольты
+			signal.minmax_clear(); // todo: сохранять статистику, переводя в вольты
 		};
 
 		addAndMakeVisible(table);
@@ -36,17 +36,17 @@ public:
 		addAndMakeVisible(cal_label_add);
 		addAndMakeVisible(cal_edit_name);
 		addAndMakeVisible(cal_label_ch);
-		addAndMakeVisible(cal_edit_ch[0]);
-		addAndMakeVisible(cal_edit_ch[1]);
+		addAndMakeVisible(cal_edit_ch.at(0));
+		addAndMakeVisible(cal_edit_ch.at(1));
 		addAndMakeVisible(cal_button);
 		addAndMakeVisible(prefix_combo);
 		cal_label_add.attachToComponent(&cal_edit_name, true);
-		cal_label_ch.attachToComponent(&cal_edit_ch[0], true);
+		cal_label_ch.attachToComponent(&cal_edit_ch.at(0), true);
 		cal_edit_name.setTextToShowWhenEmpty("Calibration Name (optional)", Colours::grey);
-		cal_edit_ch[0].setTextToShowWhenEmpty("0.0", Colours::grey); // todo: change hint according to selected pref
-		cal_edit_ch[1].setTextToShowWhenEmpty("0.0", Colours::grey);
-		cal_edit_ch[0].setInputRestrictions(0, "0123456789.");
-		cal_edit_ch[1].setInputRestrictions(0, "0123456789.");
+		cal_edit_ch.at(0).setTextToShowWhenEmpty("0.0", Colours::grey); // todo: change hint according to selected pref
+		cal_edit_ch.at(1).setTextToShowWhenEmpty("0.0", Colours::grey);
+		cal_edit_ch.at(0).setInputRestrictions(0, "0123456789.");
+		cal_edit_ch.at(1).setInputRestrictions(0, "0123456789.");
 		for (auto const& pref : _prefs)
 			prefix_combo.addItem(pref.second + "V", pref.first + 1);
 
@@ -59,27 +59,31 @@ public:
 		cal_button.setButtonText("Add");
 		cal_button.onClick = [=]
 		{
-			String ch_t[2] = { cal_edit_ch[0].getText(), cal_edit_ch[1].getText() };
-			if (ch_t[0].isEmpty() || ch_t[1].isEmpty()) return;
-
+			array<String, 2> ch_text
+            {
+                cal_edit_ch.at(0).getText(),
+                cal_edit_ch.at(1).getText()
+            };
+			if (ch_text.at(0).isEmpty() || ch_text.at(1).isEmpty()) return;
 			auto pref = _opt->load_int("pref", "0");
-			double ch[2] = {
-				ch_t[0].getDoubleValue() * pow(10.0, pref),
-				ch_t[1].getDoubleValue() * pow(10.0, pref)
+			array<double, 2> ch 
+            {
+                ch_text.at(0).getDoubleValue() * pow(10.0, pref),
+                ch_text.at(1).getDoubleValue() * pow(10.0, pref)
 			};
 
 			auto cals = _opt->load_xml("calibrations");
 			if (cals == nullptr)
-				cals = std::make_unique<XmlElement>("ROWS");
+				cals = make_unique<XmlElement>("ROWS");
 
 			auto* e  = cals->createNewChildElement("ROW");
-			auto lrb = signal.get_lrb();
+			auto rms = signal.get_rms();
 
 			e->setAttribute("name",       cal_edit_name.getText());
-			e->setAttribute("left",       ch[0]);
-			e->setAttribute("left_coef",  ch[0] / lrb.at(0));
-			e->setAttribute("right",      ch[1]);
-			e->setAttribute("right_coef", ch[1] / lrb.at(1)); // todo: check for nan
+			e->setAttribute("left",       ch.at(0));
+			e->setAttribute("left_coef",  ch.at(0) / rms.at(0));
+			e->setAttribute("right",      ch.at(1));
+			e->setAttribute("right_coef", ch.at(1) / rms.at(1)); // todo: check for nan
 
 			_opt->save("calibrations", cals.get());
 			update();
@@ -112,9 +116,8 @@ public:
 		table.updateContent();
 	};
 
-	auto coef() {
-		double nope[2] = { 1.0, 1.0 };
-		return selected == -1 ? nope : rows.at(selected).ch_coef;
+	double get_coeff(size_t ch) {
+		return selected == -1 ? 1.0 : rows.at(selected).coeff.at(ch);
 	}
 	   
 	void selectedRowsChanged(int) { }
@@ -157,9 +160,9 @@ public:
 		String text = "-----";
 
 		switch (data_selector) {
-		case cell_data_t::name:  text = rows.at(row).name;                  break;
-		case cell_data_t::left:  text = prefix(rows.at(row).ch[0], "V", 0); break;
-		case cell_data_t::right: text = prefix(rows.at(row).ch[1], "V", 0); break;
+		case cell_data_t::name:  text = rows.at(row).name;                     break;
+		case cell_data_t::left:  text = prefix(rows.at(row).ch.at(0), "V", 0); break;
+		case cell_data_t::right: text = prefix(rows.at(row).ch.at(1), "V", 0); break;
 		}
 
 		auto text_color = getLookAndFeel().findColour(ListBox::textColourId);
@@ -178,9 +181,9 @@ public:
 		auto line = bottom.removeFromBottom(_magic::height);
 		line.removeFromLeft(_magic::label);
 		int edit_width = (line.getWidth() - _magic::label) / 2;
-		cal_edit_ch[0].setBounds(line.removeFromLeft(edit_width));
+		cal_edit_ch.at(0).setBounds(line.removeFromLeft(edit_width));
 		line.removeFromLeft(_magic::margin);
-		cal_edit_ch[1].setBounds(line.removeFromLeft(edit_width));
+		cal_edit_ch.at(1).setBounds(line.removeFromLeft(edit_width));
 		line.removeFromLeft(_magic::margin);
 		prefix_combo.setBounds(line);
 		bottom.removeFromBottom(_magic::margin);
@@ -234,10 +237,10 @@ public:
 		{
 			auto* e = cals->createNewChildElement("ROW");
 			e->setAttribute("name",       row.name);
-			e->setAttribute("left",       row.ch[0]);
-			e->setAttribute("left_coef",  row.ch_coef[0]);
-			e->setAttribute("right",      row.ch[1]);
-			e->setAttribute("right_coef", row.ch_coef[1]);
+			e->setAttribute("left",       row.ch.at(0));
+			e->setAttribute("left_coef",  row.coeff.at(0));
+			e->setAttribute("right",      row.ch.at(1));
+			e->setAttribute("right_coef", row.coeff.at(1));
 		}
 		_opt->save("calibrations", cals.get());
 	}
@@ -253,7 +256,7 @@ protected:
 		char*       header;
 		uint16_t    width;
 	};
-	const std::vector<column_t> columns =
+	const vector<column_t> columns =
 	{
 		{ cell_data_t::name,   "Name",  300 },
 		{ cell_data_t::left,   "Left",  100 },
@@ -263,9 +266,9 @@ protected:
 
 	struct cal_t
 	{
-		String name;
-		double ch[2];
-		double ch_coef[2];
+		String           name;
+		array<double, 2> ch;
+		array<double, 2> coeff;
 	};
 
 	class _table_custom_button : public Component
@@ -282,7 +285,7 @@ protected:
 			};
 		}
 		void resized() override {
-			button.setBoundsInset(juce::BorderSize<int>(2));
+			button.setBoundsInset(BorderSize<int>(2));
 		}
 		void set_row(int new_row) {
 			row = new_row;
@@ -298,17 +301,18 @@ protected:
 private:
 //=========================================================================================
 
-	vector<cal_t> rows;
-	int           selected = -1;
-	signal_     & signal;
+	vector<cal_t>        rows;
+	int                  selected = -1;
+	signal_&             signal;
 
-	TableListBox  table;
-	TextEditor    cal_edit_ch[2], cal_edit_name;
-	ComboBox	  prefix_combo;
-	TextButton    cal_button;
-	Label         cal_label_add { {}, "Name"            },
-	              cal_label_ch  { {}, "Left/Right"      };
-	ToggleButton  cal_checkbox  {     "Use Calibration" };
+	TableListBox         table;
+    array<TextEditor, 2> cal_edit_ch;
+    TextEditor           cal_edit_name;
+	ComboBox	         prefix_combo;
+	TextButton           cal_button;
+	Label                cal_label_add { {}, "Name"            },
+	                     cal_label_ch  { {}, "Left/Right"      };
+	ToggleButton         cal_checkbox  {     "Use Calibration" };
 
 	String getAttributeNameForColumnId(const int columnId) const
 	{

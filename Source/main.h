@@ -7,7 +7,6 @@ namespace _magic {
 	const size_t height = 20;
 	const size_t margin = 5;
 	const size_t label  = 75;
-	const double fill   = 555.0;
 }
 
 const map<int, String> _prefs = {

@@ -5,12 +5,11 @@
 extern unique_ptr<settings_> _opt;
 
 class main_component_ : public AudioAppComponent,
-						public Timer,
-						public ChangeListener
+						public Timer
 {
 protected:
 
-	const vector<float> buff_size_list = { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 10.0f };
+	const vector<float> buff_size_list = { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 10.0f, 30.0f };
 	const vector<int>   tone_list      = { 10, 20, 200, 500, 1000, 5000, 10000, 20000 };
 	const vector<int>   order_list     = { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200 };
 
@@ -87,7 +86,7 @@ public:
 		checkbox_tone.setLookAndFeel(&theme_right_text);
 		checkbox_tone.onClick = [this]
 		{
-			signal.clear_stat();
+			signal.minmax_clear();
 			_opt->save_("checkbox_tone", checkbox_tone.getToggleState());
 		};
 		for (auto const item : tone_list)
@@ -107,7 +106,7 @@ public:
 		for (size_t line = 0; line < 3; line++)	{
 			for (size_t col = 0; col < 3; col++)
 			{
-				labels_stat.at(line).at(col).reset(new Label({}, col == 0 ? stat_captions.at(line) : String()));
+                labels_stat.at(line).at(col) = make_unique<Label>(String(), col == 0 ? stat_captions.at(line) : String());
 				addAndMakeVisible(labels_stat.at(line).at(col).get());
 			}
 			labels_stat.at(line).at(0)->attachToComponent(labels_stat.at(line).at(1).get(), true);
@@ -123,9 +122,9 @@ public:
 		button_zero_reset.setButtonText("Reset zero");
 		button_stat_reset.setButtonText("Reset stat");
 
-		button_zero.onClick       = [this] { signal.set_zero();   };
-		button_zero_reset.onClick = [this] { signal.reset_zero(); };
-		button_stat_reset.onClick = [this] { signal.clear_stat(); };
+		button_zero.onClick       = [this] { signal.zero_set();     };
+		button_zero_reset.onClick = [this] { signal.zero_clear();   };
+		button_stat_reset.onClick = [this] { signal.minmax_clear(); };
 
 		addAndMakeVisible(calibrations_component);
 		calibrations_component.update();
@@ -186,7 +185,7 @@ public:
 		combo_dev_outputs.onChange = [this]
 		{
 			signal.clear_data();
-			signal.clear_stat();
+			signal.minmax_clear();
 
 			_opt->save("device", combo_dev_outputs.getText());
 			auto sample_rate = _opt->load_int("sample_rate", "48000");
@@ -217,7 +216,6 @@ public:
 	}
 
 	//=====================================================================================
-	void changeListenerCallback(ChangeBroadcaster* /*source*/) { }
 	void releaseResources() override { }
 
 	void prepareToPlay (int /*samples_per_block*/, double sample_rate) override
@@ -229,7 +227,7 @@ public:
 		slider_freq_high.repaint();
 	}
 
-	void getNextAudioBlock (const juce::AudioSourceChannelInfo& buffer) override
+	void getNextAudioBlock (const AudioSourceChannelInfo& buffer) override
 	{
 		signal.next_audio_block(buffer);
 	}
@@ -289,55 +287,41 @@ public:
 		}
 	}
 
-	void display(Label* label, String text) {
-		if (text.contains("inf") || text.contains("nan"))
-		{
-			label->setText("--", dontSendNotification);
-			label->setColour(Label::ColourIds::textColourId, Colours::grey);
-		}
-		else {
-			label->setText(text, dontSendNotification);
-			label->setColour(Label::ColourIds::textColourId, Colours::black);
-		}
-	}
-
-	auto display(String text) {
-		if (text.contains("inf") || text.contains("nan") || text.contains("555.000"))
-		{
-			return String("--");
-		}
-		return text;
-	}
-
 	void timerCallback() override
 	{
-		auto lrb = signal.get_lrb();
+		auto rms = signal.get_rms();
+        if (rms.size() == 0) return;
+
 		function<String(double)> print;
 
 		auto calibrate = calibrations_component.is_active();
 		if (calibrate)
 		{
-			lrb.at(0) *= calibrations_component.coef()[0]; // bug: при неучтённом префиксе
-			lrb.at(1) *= calibrations_component.coef()[1];
+            rms.at(0) *= calibrations_component.get_coeff(0); // bug: при неучтённом префиксе
+            rms.at(1) *= calibrations_component.get_coeff(1);
 			print = prefix_v;
 		}
 		else {
-			lrb.at(0) = signal.gain2db(lrb[0]) - signal.stat.zero[0];
-			lrb.at(1) = signal.gain2db(lrb[1]) - signal.stat.zero[1];
+            rms.at(0) = signal.gain2db(rms.at(0)) - signal.zero_get(0);
+            rms.at(1) = signal.gain2db(rms.at(1)) - signal.zero_get(1);
 			print = [](double value) { return String(value, 3) + " dB"; };
 		}
-		lrb.at(2) = abs(lrb.at(0) - lrb.at(1));
+        rms.push_back(abs(rms.at(0) - rms.at(1)));
+        signal.minmax_set(rms);
 
-		for (size_t k = 0; k < 3; k++) {
-			if (display(String(lrb[k], 3)) != "--")
-			{
-				if (signal.stat.minmax[k][0] == _magic::fill) signal.stat.minmax[k][0] = lrb[k];
-				if (signal.stat.minmax[k][1] == _magic::fill) signal.stat.minmax[k][1] = lrb[k];
-				signal.stat.minmax[k][0] = min(signal.stat.minmax[k][0], lrb[k]); // bug: на вольтах при переключении нижняя граница не похожа на правду
-				signal.stat.minmax[k][1] = max(signal.stat.minmax[k][1], lrb[k]);
-			}
-			display(labels_stat.at(k).at(1).get(), print(lrb[k]));
-			labels_stat.at(k).at(2)->setText(display(print(signal.stat.minmax[k][0])) + " .. " + display(print(signal.stat.minmax[k][1])), dontSendNotification);
+        array<String, 3> printed;
+		for (size_t k = 0; k < 3; k++) 
+        {
+            printed.fill("--");
+            auto minmax = signal.minmax_get(k);
+
+            if (isfinite(rms.at(k)))    printed.at(0) = print(rms.at(k));
+            if (isfinite(minmax.at(0))) printed.at(1) = print(minmax.at(0));
+            if (isfinite(minmax.at(1))) printed.at(2) = print(minmax.at(1));
+
+            labels_stat.at(k).at(1)->setText(printed.at(0), dontSendNotification);
+            labels_stat.at(k).at(2)->setText(printed.at(1) + " .. " + printed.at(2), dontSendNotification);
+            labels_stat.at(k).at(1)->setColour(Label::textColourId, isfinite(rms.at(k)) ? Colours::black : Colours::grey);
 		}
 
 		if (button_zero.isEnabled()       == calibrate) button_zero.setEnabled      (!calibrate);
