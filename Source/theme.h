@@ -40,8 +40,8 @@ namespace theme
             return Font(13.5f);
         }
 
-        Font getLabelFont(Label &label) {
-            return label.getFont().withHeight(14.0f);
+        Font getLabelFont(Label &label_component) {
+            return label_component.getFont().withHeight(14.0f);
         }
 
         void drawToggleButton(Graphics& g, ToggleButton& button,

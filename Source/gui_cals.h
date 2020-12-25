@@ -66,7 +66,7 @@ public:
             };
             if (ch_text.at(0).isEmpty() || ch_text.at(1).isEmpty()) return;
             auto pref = _opt->load_int("pref", "0");
-            array<double, 2> ch 
+            array<double, 2> ch
             {
                 ch_text.at(0).getDoubleValue() * pow(10.0, pref),
                 ch_text.at(1).getDoubleValue() * pow(10.0, pref)

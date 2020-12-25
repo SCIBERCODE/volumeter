@@ -14,29 +14,31 @@ class sin_
 {
 public:
     sin_() : sampling_rate(44100.0),
-             angle        (0.0),
              angle_delta  (0.0),
              freq         (0.0)
-    { }
+    {
+        reset();
+    }
     void set_sample_rate(double sample_rate) {
         sampling_rate = sample_rate;
     }
     void reset() {
-        angle = 0.0;
+        angles.fill(0.0);
     }
     void set_freq(float frequency) {
         freq = frequency;
         auto cycles_per_sample = frequency / sampling_rate;
         angle_delta = cycles_per_sample * 2.0 * 3.14159265358979323846;
     }
-    auto sample() {
-        auto current_sample = sin(angle);
-        angle += angle_delta;
+    auto sample(size_t ch) {
+        auto current_sample = sin(angles.at(ch));
+        angles.at(ch) += angle_delta;
         return static_cast<float>(current_sample);
     }
 
 private:
-    double sampling_rate, freq, angle_delta, angle;
+    double           sampling_rate, freq, angle_delta;
+    array<double, 2> angles;
 };
 
 //=========================================================================================
@@ -115,7 +117,7 @@ public:
     }
 
     auto minmax_set(const vector<double>& rms) {
-        for (size_t k = 0; k < 3; k++) // bug: на вольтах при переключении нижн€€ граница не похожа на правду            
+        for (size_t k = 0; k < 3; k++) // bug: на вольтах при переключении нижн€€ граница не похожа на правду
             if (isfinite(rms.at(k)))
             {
                 if (!isfinite(minmax.at(k).at(0))) minmax.at(k).at(0) = rms.at(k);
@@ -174,13 +176,13 @@ public:
             {
                 iir_coeff bpfH(order, filter_type::high);
                 butterworth_iir(bpfH, 20.0 / sample_rate, 3.0);
-                iir.at(ch).at(0) = make_unique<spuce::iir<float_type, float_type>>(bpfH);
+                filter.at(ch).at(0) = make_unique<spuce::iir<float_type, float_type>>(bpfH);
             }
             if (_opt->load_int("use_bpfL", "0"))
             {
                 iir_coeff bpfL(order, filter_type::low);
                 butterworth_iir(bpfL, _opt->load_int("bpfL_value", "15000") / sample_rate, 3.0);
-                iir.at(ch).at(1) = make_unique<spuce::iir<float_type, float_type>>(bpfL);
+                filter.at(ch).at(1) = make_unique<spuce::iir<float_type, float_type>>(bpfL);
             }
         }
     };
@@ -202,41 +204,27 @@ public:
         {
             if (buff.at(0) && buff.at(1))
             {
-                auto r = buffer.buffer->getArrayOfReadPointers();
-                auto w = buffer.buffer->getArrayOfWritePointers();
+                auto read     = buffer.buffer->getArrayOfReadPointers();
+                auto write    = buffer.buffer->getArrayOfWritePointers();
+                auto use_bpfH = _opt->load_int("use_bpfH", "0") && filter.at(0).at(0);
+                auto use_bpfL = _opt->load_int("use_bpfL", "0") && filter.at(0).at(1);
+                auto use_tone = _opt->load_int("tone", "0");
 
-                for (auto k = 0; k < buffer.numSamples; ++k)
-                {
-                    buff.at(0)->enqueue(r[0][k]);
-                    buff.at(1)->enqueue(r[1][k]);
-                }
-
-                if (_opt->load_int("tone", "0"))
-                {
-                    for (auto sample = 0; sample < buffer.numSamples; ++sample)
+                for (size_t ch = 0; ch < 2; ++ch)
+                    for (auto sample_idx = 0; sample_idx < buffer.numSamples; ++sample_idx)
                     {
-                        auto tone_sample = osc.sample();
-                        w[0][sample] = tone_sample;
-                        w[1][sample] = tone_sample;
+                        buff.at(ch)->enqueue(read[ch][sample_idx]);
+                        if (use_bpfH || use_bpfL || use_tone)
+                        {
+                            float_type sample = use_tone ? osc.sample(ch) : read[ch][sample_idx];
+                            if (use_bpfH) sample = filter.at(ch).at(0)->clock(sample);
+                            if (use_bpfL) sample = filter.at(ch).at(1)->clock(sample);
+                            write[ch][sample_idx] = static_cast<float>(sample);
+                        }                        
                     }
-                }
-                else {
-                    auto use_bpfH = _opt->load_int("use_bpfH", "0") && iir.at(0).at(0);
-                    auto use_bpfL = _opt->load_int("use_bpfL", "0") && iir.at(0).at(1);
 
-                    if (use_bpfH || use_bpfL)
-                        for (size_t ch = 0; ch < 2; ++ch)
-                            for (auto sample_idx = 0; sample_idx < buffer.numSamples; ++sample_idx)
-                            {
-                                float_type sample = r[ch][sample_idx];
-                                if (use_bpfH) sample = iir.at(ch).at(0)->clock(sample);
-                                if (use_bpfL) sample = iir.at(ch).at(1)->clock(sample);
-                                w[ch][sample_idx] = static_cast<float>(sample);
-                            }
-
-                    if (!use_bpfH && !use_bpfL)
-                        buffer.clearActiveBufferRegion();
-                }
+                if (!use_bpfH && !use_bpfL && !use_tone)
+                    buffer.clearActiveBufferRegion();
             }
             audio_process.unlock();
         }
@@ -251,5 +239,5 @@ private:
     array<double, 2>                                            zero;   // [ch]
     array<array<double, 2>, 3>                                  minmax; // [ch, balance][min, max]
     array<unique_ptr<circle_>, 2>                               buff;   // [ch]
-    array<array<unique_ptr<iir<float_type, float_type>>, 2>, 2> iir;    // [ch][use_bpfH, use_bpfL]
+    array<array<unique_ptr<iir<float_type, float_type>>, 2>, 2> filter; // [ch][use_bpfH, use_bpfL]
 };
