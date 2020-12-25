@@ -60,16 +60,16 @@ public:
 		cal_button.onClick = [=]
 		{
 			array<String, 2> ch_text
-            {
-                cal_edit_ch.at(0).getText(),
-                cal_edit_ch.at(1).getText()
-            };
+			{
+				cal_edit_ch.at(0).getText(),
+				cal_edit_ch.at(1).getText()
+			};
 			if (ch_text.at(0).isEmpty() || ch_text.at(1).isEmpty()) return;
 			auto pref = _opt->load_int("pref", "0");
 			array<double, 2> ch 
-            {
-                ch_text.at(0).getDoubleValue() * pow(10.0, pref),
-                ch_text.at(1).getDoubleValue() * pow(10.0, pref)
+			{
+				ch_text.at(0).getDoubleValue() * pow(10.0, pref),
+				ch_text.at(1).getDoubleValue() * pow(10.0, pref)
 			};
 
 			auto cals = _opt->load_xml("calibrations");
@@ -119,7 +119,7 @@ public:
 	double get_coeff(size_t ch) {
 		return selected == -1 ? 1.0 : rows.at(selected).coeff.at(ch);
 	}
-	   
+
 	void selectedRowsChanged(int) { }
 	void mouseMove(const MouseEvent &) override { }
 	void sortOrderChanged(int, bool) override {	}
@@ -306,8 +306,8 @@ private:
 	signal_&             signal;
 
 	TableListBox         table;
-    array<TextEditor, 2> cal_edit_ch;
-    TextEditor           cal_edit_name;
+	array<TextEditor, 2> cal_edit_ch;
+	TextEditor           cal_edit_name;
 	ComboBox	         prefix_combo;
 	TextButton           cal_button;
 	Label                cal_label_add { {}, "Name"            },

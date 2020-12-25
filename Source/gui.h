@@ -106,7 +106,7 @@ public:
 		for (size_t line = 0; line < 3; line++)	{
 			for (size_t col = 0; col < 3; col++)
 			{
-                labels_stat.at(line).at(col) = make_unique<Label>(String(), col == 0 ? stat_captions.at(line) : String());
+				labels_stat.at(line).at(col) = make_unique<Label>(String(), col == 0 ? stat_captions.at(line) : String());
 				addAndMakeVisible(labels_stat.at(line).at(col).get());
 			}
 			labels_stat.at(line).at(0)->attachToComponent(labels_stat.at(line).at(1).get(), true);
@@ -290,38 +290,38 @@ public:
 	void timerCallback() override
 	{
 		auto rms = signal.get_rms();
-        if (rms.size() == 0) return;
+		if (rms.size() == 0) return;
 
 		function<String(double)> print;
 
 		auto calibrate = calibrations_component.is_active();
 		if (calibrate)
 		{
-            rms.at(0) *= calibrations_component.get_coeff(0); // bug: при неучтённом префиксе
-            rms.at(1) *= calibrations_component.get_coeff(1);
+			rms.at(0) *= calibrations_component.get_coeff(0); // bug: при неучтённом префиксе
+			rms.at(1) *= calibrations_component.get_coeff(1);
 			print = prefix_v;
 		}
 		else {
-            rms.at(0) = signal.gain2db(rms.at(0)) - signal.zero_get(0);
-            rms.at(1) = signal.gain2db(rms.at(1)) - signal.zero_get(1);
+			rms.at(0) = signal.gain2db(rms.at(0)) - signal.zero_get(0);
+			rms.at(1) = signal.gain2db(rms.at(1)) - signal.zero_get(1);
 			print = [](double value) { return String(value, 3) + " dB"; };
 		}
-        rms.push_back(abs(rms.at(0) - rms.at(1)));
-        signal.minmax_set(rms);
+		rms.push_back(abs(rms.at(0) - rms.at(1)));
+		signal.minmax_set(rms);
 
-        array<String, 3> printed;
+		array<String, 3> printed;
 		for (size_t k = 0; k < 3; k++) 
-        {
-            printed.fill("--");
-            auto minmax = signal.minmax_get(k);
+		{
+			printed.fill("--");
+			auto minmax = signal.minmax_get(k);
 
-            if (isfinite(rms.at(k)))    printed.at(0) = print(rms.at(k));
-            if (isfinite(minmax.at(0))) printed.at(1) = print(minmax.at(0));
-            if (isfinite(minmax.at(1))) printed.at(2) = print(minmax.at(1));
+			if (isfinite(rms.at(k)))    printed.at(0) = print(rms.at(k));
+			if (isfinite(minmax.at(0))) printed.at(1) = print(minmax.at(0));
+			if (isfinite(minmax.at(1))) printed.at(2) = print(minmax.at(1));
 
-            labels_stat.at(k).at(1)->setText(printed.at(0), dontSendNotification);
-            labels_stat.at(k).at(2)->setText(printed.at(1) + " .. " + printed.at(2), dontSendNotification);
-            labels_stat.at(k).at(1)->setColour(Label::textColourId, isfinite(rms.at(k)) ? Colours::black : Colours::grey);
+			labels_stat.at(k).at(1)->setText(printed.at(0), dontSendNotification);
+			labels_stat.at(k).at(2)->setText(printed.at(1) + " .. " + printed.at(2), dontSendNotification);
+			labels_stat.at(k).at(1)->setColour(Label::textColourId, isfinite(rms.at(k)) ? Colours::black : Colours::grey);
 		}
 
 		if (button_zero.isEnabled()       == calibrate) button_zero.setEnabled      (!calibrate);
