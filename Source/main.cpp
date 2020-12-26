@@ -28,7 +28,7 @@ void application_::initialise(const String&)
 
 String prefix(double value, String unit, size_t numder_of_decimals)
 {
-    auto   symbol = String();
+    auto   symbol    = String();
     double new_value = value;
 
     auto exp = (int)(floor(log10(value) / 3.0) * 3.0);

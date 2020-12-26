@@ -30,9 +30,9 @@ public:
         auto cycles_per_sample = frequency / sampling_rate;
         angle_delta = cycles_per_sample * 2.0 * 3.14159265358979323846;
     }
-    auto sample(size_t ch) {
-        auto current_sample = sin(angles.at(ch));
-        angles.at(ch) += angle_delta;
+    auto sample(level_t channel) {
+        auto current_sample = sin(angles.at(channel));
+        angles.at(channel) += angle_delta;
         return static_cast<float>(current_sample);
     }
 
@@ -104,12 +104,12 @@ public:
 
     void zero_set() {
         lock_guard<mutex> locker(audio_process);
-        zero.at(0) = gain2db(buff.at(0)->get_rms());
-        zero.at(1) = gain2db(buff.at(1)->get_rms());
+        zero.at(LEFT)  = gain2db(buff.at(LEFT) ->get_rms());
+        zero.at(RIGHT) = gain2db(buff.at(RIGHT)->get_rms());
         minmax_clear();
     }
-    auto zero_get(size_t ch) {
-        return zero.at(ch);
+    auto zero_get(level_t channel) {
+        return zero.at(channel);
     }
     void zero_clear() {
         zero.fill(0.0);
@@ -120,14 +120,14 @@ public:
         for (size_t k = 0; k < 3; k++) // bug: на вольтах при переключении нижн€€ граница не похожа на правду
             if (isfinite(rms.at(k)))
             {
-                if (!isfinite(minmax.at(k).at(0))) minmax.at(k).at(0) = rms.at(k);
-                if (!isfinite(minmax.at(k).at(1))) minmax.at(k).at(1) = rms.at(k);
-                minmax.at(k).at(0) = min(minmax.at(k).at(0), rms.at(k));
-                minmax.at(k).at(1) = max(minmax.at(k).at(1), rms.at(k));
+                if (!isfinite(minmax.at(k).at(MIN))) minmax.at(k).at(MIN) = rms.at(k);
+                if (!isfinite(minmax.at(k).at(MAX))) minmax.at(k).at(MAX) = rms.at(k);
+                minmax.at(k).at(MIN) = min(minmax.at(k).at(MIN), rms.at(k));
+                minmax.at(k).at(MAX) = max(minmax.at(k).at(MAX), rms.at(k));
             }
     }
-    auto minmax_get(size_t ch) {
-        return minmax.at(ch);
+    auto minmax_get(level_t channel) {
+        return minmax.at(channel);
     }
     void minmax_clear() {
         for (auto& sub : minmax)
@@ -145,24 +145,24 @@ public:
         lock_guard<mutex> locker(audio_process);
         if (new_size && sample_rate) {
             auto number_of_samples = static_cast<size_t>(new_size / (1000.0 / sample_rate));
-            buff.at(0) = make_unique<circle_>(number_of_samples);
-            buff.at(1) = make_unique<circle_>(number_of_samples);
+            buff.at(LEFT)  = make_unique<circle_>(number_of_samples);
+            buff.at(RIGHT) = make_unique<circle_>(number_of_samples);
         }
     }
     void clear_data() {
         lock_guard<mutex> locker(audio_process);
-        if (buff.at(0)) buff.at(0)->clear();
-        if (buff.at(1)) buff.at(1)->clear();
+        if (buff.at(LEFT))  buff.at(LEFT) ->clear();
+        if (buff.at(RIGHT)) buff.at(RIGHT)->clear();
     }
     void set_order(int new_order) {
         order = new_order;
     }
     vector<double> get_rms() {
         vector<double> result;
-        if (buff.at(0) && buff.at(1))
+        if (buff.at(LEFT) && buff.at(RIGHT))
         {
-            result.push_back(buff.at(0)->get_rms());
-            result.push_back(buff.at(1)->get_rms());
+            result.push_back(buff.at(LEFT) ->get_rms());
+            result.push_back(buff.at(RIGHT)->get_rms());
         };
         return result;
     }
@@ -170,19 +170,19 @@ public:
     void filter_init()
     {
         lock_guard<mutex> locker(audio_process);
-        for (size_t ch = 0; ch < 2; ++ch)
+        for (size_t channel = LEFT; channel <= RIGHT; ++channel)
         {
             if (_opt->load_int("use_bpfH", "0"))
             {
-                iir_coeff bpfH(order, filter_type::high);
-                butterworth_iir(bpfH, 20.0 / sample_rate, 3.0);
-                filter.at(ch).at(0) = make_unique<spuce::iir<float_type, float_type>>(bpfH);
+                iir_coeff high_pass(order, filter_type::high);
+                butterworth_iir(high_pass, 20.0 / sample_rate, 3.0);
+                filter.at(channel).at(HIGH_PASS) = make_unique<iir<float_type, float_type>>(high_pass);
             }
             if (_opt->load_int("use_bpfL", "0"))
             {
-                iir_coeff bpfL(order, filter_type::low);
-                butterworth_iir(bpfL, _opt->load_int("bpfL_value", "15000") / sample_rate, 3.0);
-                filter.at(ch).at(1) = make_unique<spuce::iir<float_type, float_type>>(bpfL);
+                iir_coeff low_pass(order, filter_type::low);
+                butterworth_iir(low_pass, _opt->load_int("bpfL_value", "15000") / sample_rate, 3.0);
+                filter.at(channel).at(LOW_PASS) = make_unique<iir<float_type, float_type>>(low_pass);
             }
         }
     };
@@ -202,24 +202,24 @@ public:
     {
         if (audio_process.try_lock())
         {
-            if (buff.at(0) && buff.at(1))
+            if (buff.at(LEFT) && buff.at(RIGHT))
             {
                 auto read     = buffer.buffer->getArrayOfReadPointers();
                 auto write    = buffer.buffer->getArrayOfWritePointers();
-                auto use_bpfH = _opt->load_int("use_bpfH", "0") && filter.at(0).at(0);
-                auto use_bpfL = _opt->load_int("use_bpfL", "0") && filter.at(0).at(1);
+                auto use_bpfH = _opt->load_int("use_bpfH", "0") && filter.at(HIGH_PASS).at(LEFT) && filter.at(HIGH_PASS).at(RIGHT);
+                auto use_bpfL = _opt->load_int("use_bpfL", "0") && filter.at(LOW_PASS ).at(LEFT) && filter.at(LOW_PASS ).at(RIGHT);
                 auto use_tone = _opt->load_int("tone", "0");
 
-                for (size_t ch = 0; ch < 2; ++ch)
-                    for (auto sample_idx = 0; sample_idx < buffer.numSamples; ++sample_idx)
+                for (auto channel = LEFT; channel <= RIGHT; channel++)
+                    for (auto sample_index = 0; sample_index < buffer.numSamples; ++sample_index)
                     {
-                        buff.at(ch)->enqueue(read[ch][sample_idx]);
+                        buff.at(channel)->enqueue(read[channel][sample_index]);
                         if (use_bpfH || use_bpfL || use_tone)
                         {
-                            float_type sample = use_tone ? osc.sample(ch) : read[ch][sample_idx];
-                            if (use_bpfH) sample = filter.at(ch).at(0)->clock(sample);
-                            if (use_bpfL) sample = filter.at(ch).at(1)->clock(sample);
-                            write[ch][sample_idx] = static_cast<float>(sample);
+                            float_type sample = use_tone ? osc.sample(channel) : read[channel][sample_index];
+                            if (use_bpfH) sample = filter.at(channel).at(HIGH_PASS)->clock(sample);
+                            if (use_bpfL) sample = filter.at(channel).at(LOW_PASS )->clock(sample);
+                            write[channel][sample_index] = static_cast<float>(sample);
                         }                        
                     }
 
@@ -236,8 +236,8 @@ private:
     mutex  audio_process;
     sin_   osc;
 
-    array<double, 2>                                            zero;   // [ch]
-    array<array<double, 2>, 3>                                  minmax; // [ch, balance][min, max]
-    array<unique_ptr<circle_>, 2>                               buff;   // [ch]
-    array<array<unique_ptr<iir<float_type, float_type>>, 2>, 2> filter; // [ch][use_bpfH, use_bpfL]
+    array<double, 2>                                            zero;   // [LEFT>RIGHT        ]
+    array<array<double, 2>, 3>                                  minmax; // [LEFT>RIGHT>BALANCE][min, max]
+    array<unique_ptr<circle_>, 2>                               buff;   // [LEFT>RIGHT        ]
+    array<array<unique_ptr<iir<float_type, float_type>>, 2>, 2> filter; // [LEFT>RIGHT        ][use_bpfH, use_bpfL]
 };

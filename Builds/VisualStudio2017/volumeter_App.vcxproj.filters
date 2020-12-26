@@ -2471,6 +2471,9 @@
     <ClInclude Include="..\..\Source\main.h">
       <Filter>volumeter\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\settings.h">
+      <Filter>volumeter\Source</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\signal.h">
       <Filter>volumeter\Source</Filter>
     </ClInclude>

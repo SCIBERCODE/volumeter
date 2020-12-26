@@ -11,11 +11,11 @@ public:
 
     calibrations_component_(signal_& s) : signal(s)
     {
-        addAndMakeVisible(cal_checkbox);
-        cal_checkbox.setToggleState(_opt->load_int("calibrate", "0"), dontSendNotification);
-        cal_checkbox.onClick = [this]
+        addAndMakeVisible(checkbox_cal);
+        checkbox_cal.setToggleState(_opt->load_int("calibrate", "0"), dontSendNotification);
+        checkbox_cal.onClick = [this]
         {
-            _opt->save("calibrate", cal_checkbox.getToggleState());
+            _opt->save("calibrate", checkbox_cal.getToggleState());
             signal.minmax_clear(); // todo: сохранять статистику, переводя в вольты
         };
 
@@ -33,43 +33,44 @@ public:
         for (auto const& column : columns)
             table.getHeader().addColumn(column.header, id++, column.width, 30, -1, TableHeaderComponent::notSortable);
 
-        addAndMakeVisible(cal_label_add);
-        addAndMakeVisible(cal_edit_name);
-        addAndMakeVisible(cal_label_ch);
-        addAndMakeVisible(cal_edit_ch.at(0));
-        addAndMakeVisible(cal_edit_ch.at(1));
-        addAndMakeVisible(cal_button);
-        addAndMakeVisible(prefix_combo);
-        cal_label_add.attachToComponent(&cal_edit_name, true);
-        cal_label_ch.attachToComponent(&cal_edit_ch.at(0), true);
-        cal_edit_name.setTextToShowWhenEmpty("Calibration Name (optional)", Colours::grey);
-        cal_edit_ch.at(0).setTextToShowWhenEmpty("0.0", Colours::grey); // todo: change hint according to selected pref
-        cal_edit_ch.at(1).setTextToShowWhenEmpty("0.0", Colours::grey);
-        cal_edit_ch.at(0).setInputRestrictions(0, "0123456789.");
-        cal_edit_ch.at(1).setInputRestrictions(0, "0123456789.");
-        for (auto const& pref : _prefs)
-            prefix_combo.addItem(pref.second + "V", pref.first + 1);
+        addAndMakeVisible(label_cal_add);
+        addAndMakeVisible(editor_cal_name);
+        addAndMakeVisible(label_cal_channels);
+        addAndMakeVisible(editor_cal_channels.at(LEFT));
+        addAndMakeVisible(editor_cal_channels.at(RIGHT));
+        addAndMakeVisible(button_cal_add);
+        addAndMakeVisible(combo_prefix);
 
-        prefix_combo.setSelectedId(_opt->load_int("pref", "0") + 1);
-        prefix_combo.onChange = [this]
+        label_cal_add.attachToComponent(&editor_cal_name, true);
+        label_cal_channels.attachToComponent(&editor_cal_channels.at(LEFT), true);
+        editor_cal_name.setTextToShowWhenEmpty("Calibration Name (optional)", Colours::grey);
+        editor_cal_channels.at(LEFT) .setTextToShowWhenEmpty("0.0", Colours::grey); // todo: change hint according to selected pref
+        editor_cal_channels.at(RIGHT).setTextToShowWhenEmpty("0.0", Colours::grey);
+        editor_cal_channels.at(LEFT) .setInputRestrictions(0, "0123456789.");
+        editor_cal_channels.at(RIGHT).setInputRestrictions(0, "0123456789.");
+        for (auto const& pref : _prefs)
+            combo_prefix.addItem(pref.second + "V", pref.first + 1);
+
+        combo_prefix.setSelectedId(_opt->load_int("pref", "0") + 1);
+        combo_prefix.onChange = [this]
         {
-            _opt->save("pref", prefix_combo.getSelectedId() - 1);
+            _opt->save("pref", combo_prefix.getSelectedId() - 1);
         };
 
-        cal_button.setButtonText("Add");
-        cal_button.onClick = [=]
+        button_cal_add.setButtonText("Add");
+        button_cal_add.onClick = [=]
         {
-            array<String, 2> ch_text
+            array<String, 2> channels_text
             {
-                cal_edit_ch.at(0).getText(),
-                cal_edit_ch.at(1).getText()
+                editor_cal_channels.at(LEFT) .getText(),
+                editor_cal_channels.at(RIGHT).getText()
             };
-            if (ch_text.at(0).isEmpty() || ch_text.at(1).isEmpty()) return;
+            if (channels_text.at(LEFT).isEmpty() || channels_text.at(RIGHT).isEmpty()) return;
             auto pref = _opt->load_int("pref", "0");
-            array<double, 2> ch
+            array<double, 2> channels
             {
-                ch_text.at(0).getDoubleValue() * pow(10.0, pref),
-                ch_text.at(1).getDoubleValue() * pow(10.0, pref)
+                channels_text.at(LEFT) .getDoubleValue() * pow(10.0, pref),
+                channels_text.at(RIGHT).getDoubleValue() * pow(10.0, pref)
             };
 
             auto cals = _opt->load_xml("calibrations");
@@ -79,21 +80,19 @@ public:
             auto* e  = cals->createNewChildElement("ROW");
             auto rms = signal.get_rms();
 
-            e->setAttribute("name",       cal_edit_name.getText());
-            e->setAttribute("left",       ch.at(0));
-            e->setAttribute("left_coef",  ch.at(0) / rms.at(0));
-            e->setAttribute("right",      ch.at(1));
-            e->setAttribute("right_coef", ch.at(1) / rms.at(1)); // todo: check for nan
+            e->setAttribute("name",        editor_cal_name.getText());
+            e->setAttribute("left",        channels.at(LEFT));
+            e->setAttribute("left_coeff",  channels.at(LEFT)  / rms.at(LEFT));
+            e->setAttribute("right",       channels.at(RIGHT));
+            e->setAttribute("right_coeff", channels.at(RIGHT) / rms.at(RIGHT)); // todo: check for nan
 
             _opt->save("calibrations", cals.get());
             update();
         };
     }
 
-    ~calibrations_component_() { }
-
     auto is_active() {
-        return cal_checkbox.getToggleState() && selected != -1;
+        return checkbox_cal.getToggleState() && selected != -1;
     }
 
     void update()
@@ -107,8 +106,8 @@ public:
                     el->getStringAttribute("name"),
                     el->getDoubleAttribute("left"),
                     el->getDoubleAttribute("right"),
-                    el->getDoubleAttribute("left_coef"),
-                    el->getDoubleAttribute("right_coef")
+                    el->getDoubleAttribute("left_coeff"),
+                    el->getDoubleAttribute("right_coeff")
                 });
             }
         }
@@ -116,8 +115,8 @@ public:
         table.updateContent();
     };
 
-    double get_coeff(size_t ch) {
-        return selected == -1 ? 1.0 : rows.at(selected).coeff.at(ch);
+    double get_coeff(level_t channel) {
+        return selected == -1 ? 1.0 : rows.at(selected).coeff.at(channel);
     }
 
     void selectedRowsChanged(int) { }
@@ -161,8 +160,8 @@ public:
 
         switch (data_selector) {
         case cell_data_t::name:  text = rows.at(row).name;                     break;
-        case cell_data_t::left:  text = prefix(rows.at(row).ch.at(0), "V", 0); break;
-        case cell_data_t::right: text = prefix(rows.at(row).ch.at(1), "V", 0); break;
+        case cell_data_t::left:  text = prefix(rows.at(row).channel.at(LEFT),  "V", 0); break;
+        case cell_data_t::right: text = prefix(rows.at(row).channel.at(RIGHT), "V", 0); break;
         }
 
         auto text_color = getLookAndFeel().findColour(ListBox::textColourId);
@@ -177,20 +176,20 @@ public:
         auto area = getLocalBounds();
         area.removeFromBottom(theme::margin);
         auto bottom = area.removeFromBottom(theme::height * 2 + theme::margin);
-        cal_button.setBounds(bottom.removeFromRight(theme::label).withTrimmedLeft(theme::margin));
+        button_cal_add.setBounds(bottom.removeFromRight(theme::label).withTrimmedLeft(theme::margin));
         auto line = bottom.removeFromBottom(theme::height);
         line.removeFromLeft(theme::label);
         int edit_width = (line.getWidth() - theme::label) / 2;
-        cal_edit_ch.at(0).setBounds(line.removeFromLeft(edit_width));
+        editor_cal_channels.at(LEFT).setBounds(line.removeFromLeft(edit_width));
         line.removeFromLeft(theme::margin);
-        cal_edit_ch.at(1).setBounds(line.removeFromLeft(edit_width));
+        editor_cal_channels.at(RIGHT).setBounds(line.removeFromLeft(edit_width));
         line.removeFromLeft(theme::margin);
-        prefix_combo.setBounds(line);
+        combo_prefix.setBounds(line);
         bottom.removeFromBottom(theme::margin);
         bottom.removeFromLeft(theme::label);
-        cal_edit_name.setBounds(bottom.removeFromBottom(theme::height));
+        editor_cal_name.setBounds(bottom.removeFromBottom(theme::height));
         area.removeFromBottom(theme::margin);
-        cal_checkbox.setBounds(area.removeFromTop(theme::height));
+        checkbox_cal.setBounds(area.removeFromTop(theme::height));
         area.removeFromTop(theme::margin);
         table.setBounds(area);
     }
@@ -236,11 +235,11 @@ public:
         for (const auto& row : rows)
         {
             auto* e = cals->createNewChildElement("ROW");
-            e->setAttribute("name",       row.name);
-            e->setAttribute("left",       row.ch.at(0));
-            e->setAttribute("left_coef",  row.coeff.at(0));
-            e->setAttribute("right",      row.ch.at(1));
-            e->setAttribute("right_coef", row.coeff.at(1));
+            e->setAttribute("name",        row.name);
+            e->setAttribute("left",        row.channel.at(LEFT));
+            e->setAttribute("left_coeff",  row.coeff.at(LEFT));
+            e->setAttribute("right",       row.channel.at(RIGHT));
+            e->setAttribute("right_coeff", row.coeff.at(RIGHT));
         }
         _opt->save("calibrations", cals.get());
     }
@@ -267,7 +266,7 @@ protected:
     struct cal_t
     {
         String           name;
-        array<double, 2> ch;
+        array<double, 2> channel;
         array<double, 2> coeff;
     };
 
@@ -306,13 +305,13 @@ private:
     signal_&             signal;
 
     TableListBox         table;
-    array<TextEditor, 2> cal_edit_ch;
-    TextEditor           cal_edit_name;
-    ComboBox             prefix_combo;
-    TextButton           cal_button;
-    Label                cal_label_add { {}, "Name"            },
-                         cal_label_ch  { {}, "Left/Right"      };
-    ToggleButton         cal_checkbox  {     "Use Calibration" };
+    array<TextEditor, 2> editor_cal_channels;
+    TextEditor           editor_cal_name;
+    ComboBox             combo_prefix;
+    TextButton           button_cal_add;
+    Label                label_cal_add      { {}, "Name"            },
+                         label_cal_channels { {}, "Left/Right"      };
+    ToggleButton         checkbox_cal       {     "Use Calibration" };
 
     String getAttributeNameForColumnId(const int columnId) const
     {

@@ -2129,6 +2129,7 @@
     <ClInclude Include="..\..\Source\gui.h" />
     <ClInclude Include="..\..\Source\gui_cals.h" />
     <ClInclude Include="..\..\Source\main.h" />
+    <ClInclude Include="..\..\Source\settings.h" />
     <ClInclude Include="..\..\Source\signal.h" />
     <ClInclude Include="..\..\Source\theme.h" />
     <ClInclude Include="..\..\JuceLibraryCode\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.h" />

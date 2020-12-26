@@ -100,15 +100,15 @@ public:
 
         // === stat =======================================================================
         const array<String, 3> stat_captions = { "Left", "Right", "Balance" };
-        for (size_t line = 0; line < 3; line++) {
-            for (size_t col = 0; col < 3; col++)
+        for (size_t line = 0; line < LEVEL_SIZE; line++) {
+            for (size_t column = 0; column < 3; column++)
             {
-                labels_stat.at(line).at(col) = make_unique<Label>(String(), col == 0 ? stat_captions.at(line) : String());
-                addAndMakeVisible(labels_stat.at(line).at(col).get());
+                labels_stat.at(line).at(column) = make_unique<Label>(String(), column == 0 ? stat_captions.at(line) : String());
+                addAndMakeVisible(labels_stat.at(line).at(column).get());
             }
-            labels_stat.at(line).at(0)->attachToComponent(labels_stat.at(line).at(1).get(), true);
-            labels_stat.at(line).at(1)->setFont(labels_stat.at(line).at(1)->getFont().boldened());
-            labels_stat.at(line).at(2)->setJustificationType(Justification::right);
+            labels_stat.at(line).at(labels_stat_column_t::description)->attachToComponent(labels_stat.at(line).at(1).get(), true);
+            labels_stat.at(line).at(labels_stat_column_t::value)      ->setFont(labels_stat.at(line).at(1)->getFont().boldened());
+            labels_stat.at(line).at(labels_stat_column_t::minmax)     ->setJustificationType(Justification::right);
         }
 
         addAndMakeVisible(button_zero);
@@ -294,27 +294,27 @@ public:
         auto calibrate = calibrations_component.is_active();
         if (calibrate)
         {
-            rms.at(0) *= calibrations_component.get_coeff(0); // bug: при неучтённом префиксе
-            rms.at(1) *= calibrations_component.get_coeff(1);
+            rms.at(LEFT)  *= calibrations_component.get_coeff(LEFT); // bug: при неучтённом префиксе
+            rms.at(RIGHT) *= calibrations_component.get_coeff(RIGHT);
             print = prefix_v;
         }
         else {
-            rms.at(0) = signal.gain2db(rms.at(0)) - signal.zero_get(0);
-            rms.at(1) = signal.gain2db(rms.at(1)) - signal.zero_get(1);
+            rms.at(LEFT)  = signal.gain2db(rms.at(LEFT))  - signal.zero_get(LEFT);
+            rms.at(RIGHT) = signal.gain2db(rms.at(RIGHT)) - signal.zero_get(RIGHT);
             print = [](double value) { return String(value, 3) + " dB"; };
         }
-        rms.push_back(abs(rms.at(0) - rms.at(1)));
+        rms.push_back(abs(rms.at(LEFT) - rms.at(RIGHT)));
         signal.minmax_set(rms);
 
         array<String, 3> printed;
-        for (size_t k = 0; k < 3; k++)
+        for (auto k = LEFT; k < LEVEL_SIZE; k++)
         {
             printed.fill("--");
             auto minmax = signal.minmax_get(k);
 
-            if (isfinite(rms.at(k)))    printed.at(0) = print(rms.at(k));
-            if (isfinite(minmax.at(0))) printed.at(1) = print(minmax.at(0));
-            if (isfinite(minmax.at(1))) printed.at(2) = print(minmax.at(1));
+            if (isfinite(rms.at(k)))      printed.at(0) = print(rms.at(k));
+            if (isfinite(minmax.at(MIN))) printed.at(1) = print(minmax.at(MIN));
+            if (isfinite(minmax.at(MAX))) printed.at(2) = print(minmax.at(MAX));
 
             labels_stat.at(k).at(1)->setText(printed.at(0), dontSendNotification);
             labels_stat.at(k).at(2)->setText(printed.at(1) + " .. " + printed.at(2), dontSendNotification);
@@ -333,15 +333,18 @@ private:
     ComboBox   combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone, combo_order;
     Slider     slider_freq_high;
 
+    enum labels_stat_column_t : size_t {
+        description = 0,
+        value,
+        minmax
+    };
+
     array <array<unique_ptr<Label>, 3>, 3> labels_stat;
 
-    Label
-        label_buff_size { {}, "Buff size" },
-        cal_label       { {}, "Cal"       };
-    ToggleButton
-        checkbox_tone   { "Tone"          },
-        checkbox_bpfH   { "bpfH"          },
-        checkbox_bpfL   { "bpfL"          };
+    Label        label_buff_size { {}, "Buff size" };
+    ToggleButton checkbox_tone   { "Tone"          },
+                 checkbox_bpfH   { "bpfH"          },
+                 checkbox_bpfL   { "bpfL"          };
 
     theme::checkbox_right_text_lf_ theme_right_text;
     theme::checkbox_right_lf_      theme_right;
