@@ -12,26 +12,26 @@ public:
     calibrations_component_(signal_& s) : signal(s)
     {
         addAndMakeVisible(checkbox_cal);
-        checkbox_cal.setToggleState(_opt->load_int("calibrate", "0"), dontSendNotification);
+        checkbox_cal.setToggleState(_opt->load_int("checkbox_cal"), dontSendNotification);
         checkbox_cal.onClick = [this]
         {
-            _opt->save("calibrate", checkbox_cal.getToggleState());
+            _opt->save("checkbox_cal", checkbox_cal.getToggleState());
             signal.minmax_clear(); // todo: сохранять статистику, переводя в вольты
         };
 
-        addAndMakeVisible(table);
-        table.setModel(this);
-        table.setColour(ListBox::outlineColourId, Colours::grey);
-        table.setOutlineThickness(1);
-        table.setHeaderHeight(20);
-        table.addMouseListener(this, true);
-        table.getHeader().setStretchToFitActive(true);
-        table.setRowHeight(20);
-        table.getViewport()->setScrollBarsShown(true, false);
+        addAndMakeVisible(table_cals);
+        table_cals.setModel(this);
+        table_cals.setColour(ListBox::outlineColourId, Colours::grey);
+        table_cals.setOutlineThickness(1);
+        table_cals.setHeaderHeight(20);
+        table_cals.addMouseListener(this, true);
+        table_cals.getHeader().setStretchToFitActive(true);
+        table_cals.setRowHeight(20);
+        table_cals.getViewport()->setScrollBarsShown(true, false);
 
         int id = 1;
         for (auto const& column : columns)
-            table.getHeader().addColumn(column.header, id++, column.width, 30, -1, TableHeaderComponent::notSortable);
+            table_cals.getHeader().addColumn(column.header, id++, column.width, 30, -1, TableHeaderComponent::notSortable);
 
         addAndMakeVisible(label_cal_add);
         addAndMakeVisible(editor_cal_name);
@@ -51,10 +51,10 @@ public:
         for (auto const& pref : _prefs)
             combo_prefix.addItem(pref.second + "V", pref.first + 1);
 
-        combo_prefix.setSelectedId(_opt->load_int("pref", "0") + 1);
+        combo_prefix.setSelectedId(_opt->load_int("combo_prefix") + 1);
         combo_prefix.onChange = [this]
         {
-            _opt->save("pref", combo_prefix.getSelectedId() - 1);
+            _opt->save("combo_prefix", combo_prefix.getSelectedId() - 1);
         };
 
         button_cal_add.setButtonText("Add");
@@ -66,14 +66,14 @@ public:
                 editor_cal_channels.at(RIGHT).getText()
             };
             if (channels_text.at(LEFT).isEmpty() || channels_text.at(RIGHT).isEmpty()) return;
-            auto pref = _opt->load_int("pref", "0");
+            auto pref = _opt->load_int("combo_prefix");
             array<double, 2> channels
             {
                 channels_text.at(LEFT) .getDoubleValue() * pow(10.0, pref),
                 channels_text.at(RIGHT).getDoubleValue() * pow(10.0, pref)
             };
 
-            auto cals = _opt->load_xml("calibrations");
+            auto cals = _opt->load_xml("table_cals");
             if (cals == nullptr)
                 cals = make_unique<XmlElement>("ROWS");
 
@@ -86,7 +86,7 @@ public:
             e->setAttribute("right",       channels.at(RIGHT));
             e->setAttribute("right_coeff", channels.at(RIGHT) / rms.at(RIGHT)); // todo: check for nan
 
-            _opt->save("calibrations", cals.get());
+            _opt->save("table_cals", cals.get());
             update();
         };
     }
@@ -98,7 +98,7 @@ public:
     void update()
     {
         rows.clear();
-        auto cals = _opt->load_xml("calibrations");
+        auto cals = _opt->load_xml("table_cals");
         if (cals != nullptr) {
             forEachXmlChildElement(*cals, el)
             {
@@ -111,8 +111,8 @@ public:
                 });
             }
         }
-        selected = _opt->load_int("cal_index", "-1");
-        table.updateContent();
+        selected = _opt->load_int("table_cals_row");
+        table_cals.updateContent();
     };
 
     double get_coeff(level_t channel) {
@@ -124,13 +124,13 @@ public:
     void sortOrderChanged(int, bool) override { }
 
     void backgroundClicked(const MouseEvent &) {
-        table.deselectAllRows();
+        table_cals.deselectAllRows();
     }
 
     void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на заголовке
-        auto current = table.getSelectedRow();
+        auto current = table_cals.getSelectedRow();
         selected = current == selected ? -1 : current;
-        _opt->save("cal_index", selected);
+        _opt->save("table_cals_row", selected);
         repaint();
     }
 
@@ -191,7 +191,7 @@ public:
         area.removeFromBottom(theme::margin);
         checkbox_cal.setBounds(area.removeFromTop(theme::height));
         area.removeFromTop(theme::margin);
-        table.setBounds(area);
+        table_cals.setBounds(area);
     }
 
     Component* refreshComponentForCell(int row, int column_id, bool /*selected*/, Component* component) override
@@ -216,16 +216,16 @@ public:
         if (selected == del_row)
         {
             selected = -1;
-            _opt->save("cal_index", selected);
+            _opt->save("table_cals_row", selected);
         }
         else if (del_row < selected)
         {
             selected--;
-            _opt->save("cal_index", selected);
+            _opt->save("table_cals_row", selected);
         }
-        table.updateContent();
+        table_cals.updateContent();
 
-        auto cals = _opt->load_xml("calibrations");
+        auto cals = _opt->load_xml("table_cals");
         if (cals == nullptr) {
             cals = make_unique<XmlElement>("ROWS");
             cals->createNewChildElement("SELECTION")->setAttribute("cal_index", -1);
@@ -241,7 +241,7 @@ public:
             e->setAttribute("right",       row.channel.at(RIGHT));
             e->setAttribute("right_coeff", row.coeff.at(RIGHT));
         }
-        _opt->save("calibrations", cals.get());
+        _opt->save("table_cals", cals.get());
     }
 
 //=========================================================================================
@@ -304,7 +304,7 @@ private:
     int                  selected = -1;
     signal_&             signal;
 
-    TableListBox         table;
+    TableListBox         table_cals;
     array<TextEditor, 2> editor_cal_channels;
     TextEditor           editor_cal_name;
     ComboBox             combo_prefix;

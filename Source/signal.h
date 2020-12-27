@@ -172,16 +172,16 @@ public:
         lock_guard<mutex> locker(audio_process);
         for (size_t channel = LEFT; channel <= RIGHT; ++channel)
         {
-            if (_opt->load_int("use_bpfH", "0"))
+            if (_opt->load_int("use_pass_high"))
             {
                 iir_coeff high_pass(order, filter_type::high);
                 butterworth_iir(high_pass, 20.0 / sample_rate, 3.0);
                 filter.at(channel).at(HIGH_PASS) = make_unique<iir<float_type, float_type>>(high_pass);
             }
-            if (_opt->load_int("use_bpfL", "0"))
+            if (_opt->load_int("use_pass_low"))
             {
                 iir_coeff low_pass(order, filter_type::low);
-                butterworth_iir(low_pass, _opt->load_int("bpfL_value", "15000") / sample_rate, 3.0);
+                butterworth_iir(low_pass, _opt->load_int("use_pass_low") / sample_rate, 3.0);
                 filter.at(channel).at(LOW_PASS) = make_unique<iir<float_type, float_type>>(low_pass);
             }
         }
@@ -204,26 +204,26 @@ public:
         {
             if (buff.at(LEFT) && buff.at(RIGHT))
             {
-                auto read     = buffer.buffer->getArrayOfReadPointers();
-                auto write    = buffer.buffer->getArrayOfWritePointers();
-                auto use_bpfH = _opt->load_int("use_bpfH", "0") && filter.at(HIGH_PASS).at(LEFT) && filter.at(HIGH_PASS).at(RIGHT);
-                auto use_bpfL = _opt->load_int("use_bpfL", "0") && filter.at(LOW_PASS ).at(LEFT) && filter.at(LOW_PASS ).at(RIGHT);
-                auto use_tone = _opt->load_int("tone", "0");
+                auto read          = buffer.buffer->getArrayOfReadPointers();
+                auto write         = buffer.buffer->getArrayOfWritePointers();
+                auto use_high_pass = _opt->load_int("use_pass_high") && filter.at(HIGH_PASS).at(LEFT) && filter.at(HIGH_PASS).at(RIGHT);
+                auto use_low_pass  = _opt->load_int("use_pass_low")  && filter.at(LOW_PASS ).at(LEFT) && filter.at(LOW_PASS ).at(RIGHT);
+                auto use_tone      = _opt->load_int("tone");
 
                 for (auto channel = LEFT; channel <= RIGHT; channel++)
                     for (auto sample_index = 0; sample_index < buffer.numSamples; ++sample_index)
                     {
                         buff.at(channel)->enqueue(read[channel][sample_index]);
-                        if (use_bpfH || use_bpfL || use_tone)
+                        if (use_high_pass || use_low_pass || use_tone)
                         {
                             float_type sample = use_tone ? osc.sample(channel) : read[channel][sample_index];
-                            if (use_bpfH) sample = filter.at(channel).at(HIGH_PASS)->clock(sample);
-                            if (use_bpfL) sample = filter.at(channel).at(LOW_PASS )->clock(sample);
+                            if (use_high_pass) sample = filter.at(channel).at(HIGH_PASS)->clock(sample);
+                            if (use_low_pass)  sample = filter.at(channel).at(LOW_PASS )->clock(sample);
                             write[channel][sample_index] = static_cast<float>(sample);
                         }                        
                     }
 
-                if (!use_bpfH && !use_bpfL && !use_tone)
+                if (!use_high_pass && !use_low_pass && !use_tone)
                     buffer.clearActiveBufferRegion();
             }
             audio_process.unlock();
@@ -237,7 +237,7 @@ private:
     sin_   osc;
 
     array<double, 2>                                            zero;   // [LEFT>RIGHT        ]
-    array<array<double, 2>, 3>                                  minmax; // [LEFT>RIGHT>BALANCE][min, max]
+    array<array<double, 2>, 3>                                  minmax; // [LEFT>RIGHT>BALANCE][MIN>MAX]
     array<unique_ptr<circle_>, 2>                               buff;   // [LEFT>RIGHT        ]
-    array<array<unique_ptr<iir<float_type, float_type>>, 2>, 2> filter; // [LEFT>RIGHT        ][use_bpfH, use_bpfL]
+    array<array<unique_ptr<iir<float_type, float_type>>, 2>, 2> filter; // [LEFT>RIGHT        ][HIGH_PASS>LOW_PASS]
 };
