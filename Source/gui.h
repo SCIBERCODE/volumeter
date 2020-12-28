@@ -28,7 +28,7 @@ public:
         addAndMakeVisible(combo_order);
 
         checkbox_high_pass.setToggleState(_opt->load_int("checkbox_high_pass"), dontSendNotification);
-        checkbox_low_pass.setToggleState(_opt->load_int("checkbox_low_pass"), dontSendNotification);
+        checkbox_low_pass. setToggleState(_opt->load_int("checkbox_low_pass" ), dontSendNotification);
         checkbox_high_pass.setLookAndFeel(&theme_right);
 
         checkbox_high_pass.onClick = [this] {
@@ -99,16 +99,19 @@ public:
         };
 
         // === stat =======================================================================
-        const array<String, 3> stat_captions = { "Left", "Right", "Balance" };
-        for (size_t line = 0; line < LEVEL_SIZE; line++) {
-            for (size_t column = 0; column < 3; column++)
+        const array<String, 3> stat_captions = { "Left", "Right", "Balance" }; // todo: хорошо бы по точке центровать цифры
+        for (auto line = LEFT; line < LEVEL_SIZE; line++) {
+            for (auto column = LABEL; column < LABELS_STAT_COLUMN_SIZE; column++)
             {
-                labels_stat.at(line).at(column) = make_unique<Label>(String(), column == 0 ? stat_captions.at(line) : String());
-                addAndMakeVisible(labels_stat.at(line).at(column).get());
+                auto label = make_unique<Label>(String(), column == LABEL ? stat_captions.at(line) : String());
+                addAndMakeVisible(label.get());
+                labels_stat.at(line).at(column) = move(label);
+                
             }
-            labels_stat.at(line).at(labels_stat_column_t::description)->attachToComponent(labels_stat.at(line).at(1).get(), true);
-            labels_stat.at(line).at(labels_stat_column_t::value)      ->setFont(labels_stat.at(line).at(1)->getFont().boldened());
-            labels_stat.at(line).at(labels_stat_column_t::minmax)     ->setJustificationType(Justification::right);
+            auto label_value = labels_stat.at(line).at(VALUE).get();
+            labels_stat.at(line).at(LABEL) ->attachToComponent(label_value, true);
+            labels_stat.at(line).at(VALUE) ->setFont(label_value->getFont().boldened());
+            labels_stat.at(line).at(MINMAX)->setJustificationType(Justification::right);
         }
 
         addAndMakeVisible(button_zero);
@@ -282,13 +285,15 @@ public:
         auto right = area.removeFromRight(getWidth() / 2);
         right.removeFromRight(theme::margin * 2);
 
-        for (size_t k = 0; k < 3; k++) {
-            labels_stat.at(k).at(1)->setBounds(area.removeFromTop(theme::height));
-            if (k < 2) area.removeFromTop(theme::margin);
-        }
-        for (size_t k = 0; k < 3; k++) {
-            labels_stat.at(k).at(2)->setBounds(right.removeFromTop(theme::height));
-            if (k < 2) right.removeFromTop(theme::margin);
+        for (auto line_index = LEFT; line_index < LEVEL_SIZE; line_index++)
+        {
+            labels_stat.at(line_index).at(labels_stat_column_t::VALUE) ->setBounds(area.removeFromTop (theme::height));
+            labels_stat.at(line_index).at(labels_stat_column_t::MINMAX)->setBounds(right.removeFromTop(theme::height));
+
+            if (line_index < level_t::BALANCE) {
+                area .removeFromTop(theme::margin);
+                right.removeFromTop(theme::margin);
+            }
         }
     }
 
@@ -315,18 +320,18 @@ public:
         signal.minmax_set(rms);
 
         array<String, 3> printed;
-        for (auto k = LEFT; k < LEVEL_SIZE; k++)
+        for (auto line = LEFT; line < LEVEL_SIZE; line++)
         {
             printed.fill("--");
-            auto minmax = signal.minmax_get(k);
+            auto minmax = signal.minmax_get(line);
 
-            if (isfinite(rms.at(k)))      printed.at(0) = print(rms.at(k));
+            if (isfinite(rms.at(line)))   printed.at(0) = print(rms.at(line));
             if (isfinite(minmax.at(MIN))) printed.at(1) = print(minmax.at(MIN));
             if (isfinite(minmax.at(MAX))) printed.at(2) = print(minmax.at(MAX));
 
-            labels_stat.at(k).at(1)->setText(printed.at(0), dontSendNotification);
-            labels_stat.at(k).at(2)->setText(printed.at(1) + " .. " + printed.at(2), dontSendNotification);
-            labels_stat.at(k).at(1)->setColour(Label::textColourId, isfinite(rms.at(k)) ? Colours::black : Colours::grey);
+            labels_stat.at(line).at(1)->setText(printed.at(0), dontSendNotification);
+            labels_stat.at(line).at(2)->setText(printed.at(1) + " .. " + printed.at(2), dontSendNotification);
+            labels_stat.at(line).at(1)->setColour(Label::textColourId, isfinite(rms.at(line)) ? Colours::black : Colours::grey);
         }
 
         if (button_zero.isEnabled()       == calibrate) button_zero.setEnabled      (!calibrate);
@@ -341,13 +346,7 @@ private:
     ComboBox   combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone, combo_order;
     Slider     slider_freq_high;
 
-    enum labels_stat_column_t : size_t {
-        description = 0,
-        value,
-        minmax
-    };
-
-    array <array<unique_ptr<Label>, 3>, 3> labels_stat;
+    array <array<unique_ptr<Label>, 3>, 3> labels_stat; // [LEFT>RIGHT>BALANCE][MIN>MAX]
 
     Label        label_buff_size    { {}, "Buff size" };
     ToggleButton checkbox_tone      { "Tone"          },

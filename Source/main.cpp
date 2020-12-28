@@ -16,7 +16,7 @@ application_::~application_() {
 }
 
 const String application_::getApplicationName()    { return "rms volumeter"; }
-const String application_::getApplicationVersion() { return "1.0.0";         }
+const String application_::getApplicationVersion() { return __DATE__;        }
 void application_::shutdown()                      { main_window = nullptr;  }
 bool application_::moreThanOneInstanceAllowed()    { return true;            }
 

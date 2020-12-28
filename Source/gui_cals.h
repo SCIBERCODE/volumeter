@@ -317,7 +317,7 @@ private:
     {
         int id = 1;
         for (auto const column : columns) {
-            if (columnId == id++) return column.header;
+            if (columnId == ++id) return column.header;
         }
         return {};
     }

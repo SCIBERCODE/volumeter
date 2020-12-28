@@ -33,9 +33,17 @@ enum filter_type_t : size_t {
     LOW_PASS
 };
 
-inline void operator ++(level_t& value, int)
-{
-    value = static_cast<level_t>(value + 1);
+enum labels_stat_column_t : size_t {
+    LABEL = 0,
+    VALUE,
+    MINMAX,
+    LABELS_STAT_COLUMN_SIZE
+};
+
+template <typename T>
+void operator ++(T& value, int)
+{ 
+    value = static_cast<T>(value + 1);
 }
 
 String prefix(double value, String unit, size_t numder_of_decimals);

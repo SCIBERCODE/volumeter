@@ -117,13 +117,13 @@ public:
     }
 
     auto minmax_set(const vector<double>& rms) {
-        for (size_t k = 0; k < 3; k++) // bug: на вольтах при переключении нижн€€ граница не похожа на правду
-            if (isfinite(rms.at(k)))
+        for (auto line = LEFT; line < LEVEL_SIZE; line++) // bug: на вольтах при переключении нижн€€ граница не похожа на правду
+            if (isfinite(rms.at(line)))
             {
-                if (!isfinite(minmax.at(k).at(MIN))) minmax.at(k).at(MIN) = rms.at(k);
-                if (!isfinite(minmax.at(k).at(MAX))) minmax.at(k).at(MAX) = rms.at(k);
-                minmax.at(k).at(MIN) = min(minmax.at(k).at(MIN), rms.at(k));
-                minmax.at(k).at(MAX) = max(minmax.at(k).at(MAX), rms.at(k));
+                if (!isfinite(minmax.at(line).at(MIN))) minmax.at(line).at(MIN) = rms.at(line);
+                if (!isfinite(minmax.at(line).at(MAX))) minmax.at(line).at(MAX) = rms.at(line);
+                minmax.at(line).at(MIN) = min(minmax.at(line).at(MIN), rms.at(line));
+                minmax.at(line).at(MAX) = max(minmax.at(line).at(MAX), rms.at(line));
             }
     }
     auto minmax_get(level_t channel) {
@@ -170,7 +170,7 @@ public:
     void filter_init()
     {
         lock_guard<mutex> locker(audio_process);
-        for (size_t channel = LEFT; channel <= RIGHT; ++channel)
+        for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
             if (_opt->load_int("use_pass_high"))
             {
