@@ -2468,6 +2468,9 @@
     <ClInclude Include="..\..\Source\gui_cals.h">
       <Filter>volumeter\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\gui_filter.h">
+      <Filter>volumeter\Source</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\main.h">
       <Filter>volumeter\Source</Filter>
     </ClInclude>

@@ -15,7 +15,7 @@ application_::~application_() {
     _opt.reset();
 }
 
-const String application_::getApplicationName()    { return "rms volumeter"; }
+const String application_::getApplicationName()    { return "rms_volumeter"; }
 const String application_::getApplicationVersion() { return __DATE__;        }
 void application_::shutdown()                      { main_window = nullptr;  }
 bool application_::moreThanOneInstanceAllowed()    { return true;            }
@@ -23,7 +23,7 @@ bool application_::moreThanOneInstanceAllowed()    { return true;            }
 void application_::initialise(const String&)
 {
     Desktop::getInstance().setDefaultLookAndFeel(&theme);
-    main_window = make_unique<main_window_>("volumeter", new main_component_(), *this);
+    main_window = make_unique<main_window_>("rms volumeter", new main_component_(), *this);
 }
 
 String prefix(double value, String unit, size_t numder_of_decimals)

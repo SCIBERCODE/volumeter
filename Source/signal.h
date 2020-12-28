@@ -45,42 +45,51 @@ private:
 class circle_
 //=========================================================================================
 {
+protected:
+    struct iterator
+    {
+        size_t  size;
+        size_t  pointer;
+        level_t channel;
+    };
 private:
-    unique_ptr<float[]> buffer;
-    size_t              head;
-    size_t              tail;
-    size_t              max_size;
+    array<unique_ptr<float[]>, 2> buffer;
+    array<size_t, 2>              tail;
+    size_t                        max_size;
+    iterator                      it;
 public:
-    circle_(size_t max_size) : buffer(make_unique<float[]>(max_size)),
-                               max_size(max_size),
-                               head(0),
-                               tail(0)
+    circle_(size_t max_size)
+           : buffer({ make_unique<float[]>(max_size),
+                      make_unique<float[]>(max_size) }),
+             max_size(max_size)
     {
         clear();
-    };
+    }
 
     void clear()
     {
-        fill_n(buffer.get(), max_size, numeric_limits<float>::quiet_NaN());
+        if (buffer.at(LEFT))  fill_n(buffer.at(LEFT).get(),  max_size, numeric_limits<float>::quiet_NaN());
+        if (buffer.at(RIGHT)) fill_n(buffer.at(RIGHT).get(), max_size, numeric_limits<float>::quiet_NaN());
+        tail.fill(0);
     }
 
-    void enqueue(float item)
+    void enqueue(level_t channel, float value)
     {
-        if (max_size && item)
+        if (max_size && value)
         {
-            buffer[tail] = item * item;
-            tail = (tail + 1) % max_size;
+            buffer.at(channel)[tail.at(channel)] = value;
+            tail.at(channel) = (tail.at(channel) + 1) % max_size;
         }
     }
 
-    double get_rms()
+    double get_rms(level_t channel)
     {
-        double sum  = 0.0;
+        double sum = 0.0;
         size_t size = 0;
 
         for (size_t k = 0; k < max_size; ++k)
         {
-            auto sample = buffer[k];
+            auto sample = buffer.at(channel)[k];
             if (isfinite(sample) && sample) {
                 sum += sample;
                 size++;
@@ -88,7 +97,36 @@ public:
         }
         return sqrt(sum / size);
     }
+
+    bool get_first_value(level_t channel, size_t size, float& value) {
+        if (size == 0 || size > max_size)
+            return false;
+
+        it.pointer = tail.at(channel) - 1;
+        it.size    = size;
+        it.channel = channel;
+        return get_next_value(value);
+    }
+
+    bool get_next_value(float& value) {
+        value = numeric_limits<float>::quiet_NaN();
+        if (it.pointer >= 0 && it.size)
+        {
+            value = buffer.at(it.channel)[it.pointer];
+            if (it.pointer == 0)
+                it.pointer = max_size - 1;
+            else
+                it.pointer--;
+
+            it.size--;
+        };
+        if (!isfinite(value))
+            it = { 0 };
+
+        return isfinite(value);
+    }
 };
+
 
 //=========================================================================================
 class signal_
@@ -104,8 +142,8 @@ public:
 
     void zero_set() {
         lock_guard<mutex> locker(audio_process);
-        zero.at(LEFT)  = gain2db(buff.at(LEFT) ->get_rms());
-        zero.at(RIGHT) = gain2db(buff.at(RIGHT)->get_rms());
+        zero.at(LEFT)  = gain2db(buff->get_rms(LEFT));
+        zero.at(RIGHT) = gain2db(buff->get_rms(RIGHT));
         minmax_clear();
     }
     auto zero_get(level_t channel) {
@@ -145,24 +183,23 @@ public:
         lock_guard<mutex> locker(audio_process);
         if (new_size && sample_rate) {
             auto number_of_samples = static_cast<size_t>(new_size / (1000.0 / sample_rate));
-            buff.at(LEFT)  = make_unique<circle_>(number_of_samples);
-            buff.at(RIGHT) = make_unique<circle_>(number_of_samples);
+            buff = make_unique<circle_>(number_of_samples);
         }
     }
     void clear_data() {
         lock_guard<mutex> locker(audio_process);
-        if (buff.at(LEFT))  buff.at(LEFT) ->clear();
-        if (buff.at(RIGHT)) buff.at(RIGHT)->clear();
+        if (buff)
+            buff->clear();
     }
     void set_order(int new_order) {
         order = new_order;
     }
     vector<double> get_rms() {
         vector<double> result;
-        if (buff.at(LEFT) && buff.at(RIGHT))
+        if (buff)
         {
-            result.push_back(buff.at(LEFT) ->get_rms());
-            result.push_back(buff.at(RIGHT)->get_rms());
+            result.push_back(buff->get_rms(LEFT));
+            result.push_back(buff->get_rms(RIGHT));
         };
         return result;
     }
@@ -202,7 +239,7 @@ public:
     {
         if (audio_process.try_lock())
         {
-            if (buff.at(LEFT) && buff.at(RIGHT))
+            if (buff)
             {
                 auto read          = buffer.buffer->getArrayOfReadPointers();
                 auto write         = buffer.buffer->getArrayOfWritePointers();
@@ -213,7 +250,7 @@ public:
                 for (auto channel = LEFT; channel <= RIGHT; channel++)
                     for (auto sample_index = 0; sample_index < buffer.numSamples; ++sample_index)
                     {
-                        buff.at(channel)->enqueue(read[channel][sample_index]);
+                        buff->enqueue(channel, read[channel][sample_index] * read[channel][sample_index]);
                         if (use_high_pass || use_low_pass || use_tone)
                         {
                             float_type sample = use_tone ? osc.sample(channel) : read[channel][sample_index];
@@ -231,13 +268,12 @@ public:
     }
 
 private:
-    double sample_rate;
-    size_t order;
-    mutex  audio_process;
-    sin_   osc;
-
-    array<double, 2>                                            zero;   // [LEFT>RIGHT        ]
-    array<array<double, 2>, 3>                                  minmax; // [LEFT>RIGHT>BALANCE][MIN>MAX]
-    array<unique_ptr<circle_>, 2>                               buff;   // [LEFT>RIGHT        ]
+    double                     sample_rate;
+    size_t                     order;
+    mutex                      audio_process;
+    sin_                       osc;
+    unique_ptr<circle_>        buff;
+    array<double, 2>           zero;                                    // [LEFT>RIGHT        ]
+    array<array<double, 2>, 3> minmax;                                  // [LEFT>RIGHT>BALANCE][MIN>MAX]
     array<array<unique_ptr<iir<float_type, float_type>>, 2>, 2> filter; // [LEFT>RIGHT        ][HIGH_PASS>LOW_PASS]
 };

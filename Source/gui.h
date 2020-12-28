@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <JuceHeader.h>
+#include "gui_filter.h"
 #include "gui_cals.h"
 
 extern unique_ptr<settings_> _opt;
@@ -16,9 +17,14 @@ protected:
 //=========================================================================================
 public:
 //=========================================================================================
-
     main_component_() : calibrations_component(signal)
     {
+        auto display_width = 0;
+        for (auto display : Desktop::getInstance().getDisplays().displays)
+            display_width += display.userArea.getWidth();
+
+        history_stat = make_unique<circle_>(display_width);
+
         load_devices();
 
         // === filter =====================================================================
@@ -129,7 +135,7 @@ public:
         addAndMakeVisible(calibrations_component);
         calibrations_component.update();
 
-        setSize(430, 670);
+        setSize(430, 780);
         startTimer(100);
 
         setAudioChannels(2, 2);
@@ -148,6 +154,14 @@ public:
         addAndMakeVisible(combo_dev_types);
         addAndMakeVisible(combo_dev_outputs);
         addAndMakeVisible(combo_dev_rates);
+
+        addAndMakeVisible(label_device_type);
+        addAndMakeVisible(label_device);
+        addAndMakeVisible(label_sample_rate);
+
+        label_device_type.attachToComponent(&combo_dev_types,   true);
+        label_device     .attachToComponent(&combo_dev_outputs, true);
+        label_sample_rate.attachToComponent(&combo_dev_rates,   true);
 
         const OwnedArray<AudioIODeviceType>& types = deviceManager.getAvailableDeviceTypes();
         if (types.size() > 1)
@@ -221,7 +235,7 @@ public:
     //=====================================================================================
     void releaseResources() override { }
 
-    void prepareToPlay (int /*samples_per_block*/, double sample_rate) override
+    void prepareToPlay(int /*samples_per_block*/, double sample_rate) override
     {
         combo_buff_size.onChange();
         signal.prepare_to_play(sample_rate);
@@ -230,7 +244,7 @@ public:
         slider_freq_high.repaint();
     }
 
-    void getNextAudioBlock (const AudioSourceChannelInfo& buffer) override
+    void getNextAudioBlock(const AudioSourceChannelInfo& buffer) override
     {
         signal.next_audio_block(buffer);
     }
@@ -238,14 +252,18 @@ public:
     void resized() override
     {
         auto area = getLocalBounds().reduced(theme::margin * 2);
+        auto combo_with_label = [&](ComboBox& combo)
+        {
+            auto line = area.removeFromTop(theme::height);
+            line.removeFromLeft(theme::label);
+            combo.setBounds(line);
+            area.removeFromTop(theme::margin);
+        };
 
         // === devices ====================================================================
-        combo_dev_types.setBounds(area.removeFromTop(theme::height));
-        area.removeFromTop(theme::margin);
-        combo_dev_outputs.setBounds(area.removeFromTop(theme::height));
-        area.removeFromTop(theme::margin);
-        combo_dev_rates.setBounds(area.removeFromTop(theme::height));
-        area.removeFromTop(theme::margin);
+        combo_with_label(combo_dev_types);
+        combo_with_label(combo_dev_outputs);
+        combo_with_label(combo_dev_rates);
 
         // === filter =====================================================================
         auto line = area.removeFromTop(theme::height);
@@ -278,9 +296,9 @@ public:
         area.removeFromBottom(theme::margin);
         button_zero_reset.setBounds(area.removeFromBottom(theme::height));
         area.removeFromBottom(theme::margin);
-        button_zero.setBounds(area.removeFromBottom(theme::height));
-        area.removeFromBottom(theme::margin);
-
+        button_zero.setBounds(area.removeFromBottom(theme::height));        
+        
+        auto remain = area;
         area.removeFromLeft(theme::label);
         auto right = area.removeFromRight(getWidth() / 2);
         right.removeFromRight(theme::margin * 2);
@@ -289,12 +307,17 @@ public:
         {
             labels_stat.at(line_index).at(labels_stat_column_t::VALUE) ->setBounds(area.removeFromTop (theme::height));
             labels_stat.at(line_index).at(labels_stat_column_t::MINMAX)->setBounds(right.removeFromTop(theme::height));
+            remain.removeFromTop(theme::height);
 
             if (line_index < level_t::BALANCE) {
                 area .removeFromTop(theme::margin);
                 right.removeFromTop(theme::margin);
+                remain.removeFromTop(theme::margin);
             }
         }
+        remain.removeFromTop(theme::margin);
+        remain.removeFromBottom(theme::margin);
+        history_plot = remain;
     }
 
     void timerCallback() override
@@ -319,6 +342,12 @@ public:
         rms.push_back(abs(rms.at(LEFT) - rms.at(RIGHT)));
         signal.minmax_set(rms);
 
+        if (isfinite(rms.at(LEFT))) { // todo: syncrochannels
+            history_stat->enqueue(LEFT,  static_cast<float>(rms.at(LEFT)));
+            history_stat->enqueue(RIGHT, static_cast<float>(rms.at(RIGHT)));
+            repaint();
+        }
+
         array<String, 3> printed;
         for (auto line = LEFT; line < LEVEL_SIZE; line++)
         {
@@ -338,26 +367,62 @@ public:
         if (button_zero_reset.isEnabled() == calibrate) button_zero_reset.setEnabled(!calibrate);
     }
 
+    float freq2pos(float freq) {
+        return jmap(
+            std::log(freq),
+            std::log(20.0f), std::log(20000.0f),
+            0.0f, static_cast<float>(history_plot.getWidth())
+        ) + history_plot.getX();
+    }
+
+    void paint(Graphics& g) override {
+        g.setColour(Colours::white);
+        g.fillRect(history_plot);
+        g.setColour(Colours::grey);
+        g.drawRect(history_plot);
+        g.setColour(Colours::black);
+
+        Path path;
+        float offset = 0;
+
+        float value;
+        if (history_stat->get_first_value(LEFT, history_plot.getWidth(), value))
+            do {
+                auto x = history_plot.getRight() - offset++;
+                auto y = abs(value * (history_plot.getHeight() / 130.0f)) + history_plot.getY();
+                if (path.isEmpty())
+                    path.startNewSubPath(x, y);
+
+                path.lineTo(x, y);
+            } 
+            while (history_stat->get_next_value(value));
+
+        g.strokePath(path, PathStrokeType(1.0f));
+    }
+
 //=========================================================================================
 private:
 //=========================================================================================
 
-    TextButton button_zero, button_zero_reset, button_stat_reset;
-    ComboBox   combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone, combo_order;
-    Slider     slider_freq_high;
+    array<array<unique_ptr<Label>, 3>, 3>  labels_stat;  // [LEFT>RIGHT>BALANCE][MIN>MAX]
+    unique_ptr<circle_>                    history_stat; // [LEFT>RIGHT        ]
+    signal_                                signal;
+    calibrations_component_                calibrations_component;
+    Rectangle<int>                         history_plot;
 
-    array <array<unique_ptr<Label>, 3>, 3> labels_stat; // [LEFT>RIGHT>BALANCE][MIN>MAX]
+    Label        label_device_type  { {}, "Type"        },
+                 label_device       { {}, "Device"      },
+                 label_sample_rate  { {}, "Sample rate" },
+                 label_buff_size    { {}, "Buff size"   };
+    ToggleButton checkbox_tone      { "Tone"            },
+                 checkbox_high_pass { "High pass"       },
+                 checkbox_low_pass  { "Low pass"        };
 
-    Label        label_buff_size    { {}, "Buff size" };
-    ToggleButton checkbox_tone      { "Tone"          },
-                 checkbox_high_pass { "High pass"     },
-                 checkbox_low_pass  { "Low pass"      };
-
+    TextButton                     button_zero, button_zero_reset, button_stat_reset;
+    ComboBox                       combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone, combo_order;
+    Slider                         slider_freq_high;
     theme::checkbox_right_text_lf_ theme_right_text;
     theme::checkbox_right_lf_      theme_right;
-
-    signal_                 signal;
-    calibrations_component_ calibrations_component;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_component_)
 };

@@ -67,14 +67,14 @@ protected:
     class main_window_ : public DocumentWindow
     {
     public:
-        main_window_ (const String& name, Component* c, JUCEApplication& a)
-            : DocumentWindow(name, theme::grey_level(239), DocumentWindow::allButtons), app(a)
+        main_window_ (const String& name, Component* component, JUCEApplication& a) :
+            DocumentWindow(name, theme::grey_level(239), DocumentWindow::allButtons),
+            app(a)
         {
             setUsingNativeTitleBar(false);
             setTitleBarTextCentred(true);
             setResizable(true, false);
-            setContentOwned(c, true);
-            setResizeLimits(300, 250, 10000, 10000);
+            setContentOwned(component, true);
             centreWithSize(getWidth(), getHeight());
             setVisible(true);
             toFront(true);
@@ -87,7 +87,6 @@ protected:
 
     private:
         JUCEApplication& app;
-
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_window_)
     };
 
