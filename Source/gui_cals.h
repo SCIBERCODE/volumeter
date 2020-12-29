@@ -9,7 +9,7 @@ class calibrations_component_ : public Component,
 {
 public:
 
-    calibrations_component_(signal_& s) : signal(s)
+    calibrations_component_(signal_& _signal) : signal(_signal)
     {
         addAndMakeVisible(checkbox_cal);
         checkbox_cal.setToggleState(_opt->load_int("checkbox_cal"), dontSendNotification);
@@ -156,7 +156,7 @@ public:
     void paintCell(Graphics& g, int row, int column_id, int width, int height, bool /*selected*/) override
     {
         auto data_selector = columns.at(column_id - 1).type;
-        String text = "-----";
+        String text(theme::empty);
 
         switch (data_selector) {
         case cell_data_t::name:  text = rows.at(row).name;                     break;
@@ -302,8 +302,7 @@ private:
 
     vector<cal_t>        rows;
     int                  selected = -1;
-    signal_&             signal;
-
+    signal_            & signal;
     TableListBox         table_cals;
     array<TextEditor, 2> editor_cal_channels;
     TextEditor           editor_cal_name;

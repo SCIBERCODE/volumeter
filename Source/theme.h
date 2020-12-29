@@ -6,6 +6,7 @@ namespace theme
     const size_t height = 20;
     const size_t margin = 5;
     const size_t label  = 80;
+    const char*  empty  = "--";
 
     auto grey_level(uint8_t level) {
         return Colour::greyLevel(jmap((float)level, 0.0f, 256.0f, 0.0f, 1.0f));

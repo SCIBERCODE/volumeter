@@ -12,12 +12,13 @@ protected:
 
     const vector<float> buff_size_list = { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 10.0f, 30.0f };
     const vector<int>   tone_list      = { 10, 20, 200, 500, 1000, 5000, 10000, 20000 };
-    const vector<int>   order_list     = { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200 };
 
 //=========================================================================================
 public:
 //=========================================================================================
-    main_component_() : calibrations_component(signal)
+    main_component_() :
+        calibrations_component(signal),
+        filter_component      (signal)
     {
         auto display_width = 0;
         for (auto display : Desktop::getInstance().getDisplays().displays)
@@ -26,47 +27,6 @@ public:
         history_stat = make_unique<circle_>(display_width);
 
         load_devices();
-
-        // === filter =====================================================================
-        addAndMakeVisible(checkbox_high_pass);
-        addAndMakeVisible(checkbox_low_pass);
-        addAndMakeVisible(slider_freq_high);
-        addAndMakeVisible(combo_order);
-
-        checkbox_high_pass.setToggleState(_opt->load_int("checkbox_high_pass"), dontSendNotification);
-        checkbox_low_pass. setToggleState(_opt->load_int("checkbox_low_pass" ), dontSendNotification);
-        checkbox_high_pass.setLookAndFeel(&theme_right);
-
-        checkbox_high_pass.onClick = [this] {
-            _opt->save("checkbox_high_pass", checkbox_high_pass.getToggleState());
-            signal.filter_init();
-        };
-        checkbox_low_pass.onClick = [this] {
-            _opt->save("checkbox_low_pass", checkbox_low_pass.getToggleState());
-            signal.filter_init();
-        };
-
-        slider_freq_high.setSliderStyle(Slider::LinearHorizontal);
-        slider_freq_high.setTextBoxStyle(Slider::TextBoxRight, false, 60, 20);
-        slider_freq_high.setRange(20, 20000, 1);
-        slider_freq_high.setValue(_opt->load_int("slider_freq_high"), dontSendNotification);
-        slider_freq_high.onDragEnd = [this] {
-            _opt->save("slider_freq_high", slider_freq_high.getValue());
-            signal.filter_init();
-        };
-
-        for (auto const item : order_list)
-            combo_order.addItem(String(item), item);
-
-        combo_order.setSelectedId(_opt->load_int("combo_order"), dontSendNotification);
-        combo_order.setTooltip("Filter Order");
-        combo_order.onChange = [this]
-        {
-            auto value = combo_order.getSelectedId();
-            _opt->save("combo_order", value);
-            signal.set_order(value);
-            signal.filter_init();
-        };
 
         // === middle settings ============================================================
         addAndMakeVisible(combo_buff_size);
@@ -132,6 +92,7 @@ public:
         button_zero_reset.onClick = [this] { signal.zero_clear();   };
         button_stat_reset.onClick = [this] { signal.minmax_clear(); };
 
+        addAndMakeVisible(filter_component);
         addAndMakeVisible(calibrations_component);
         calibrations_component.update();
 
@@ -145,7 +106,6 @@ public:
     {
         shutdownAudio();
         checkbox_tone.setLookAndFeel(nullptr);
-        checkbox_high_pass.setLookAndFeel(nullptr);
     }
 
     //=====================================================================================
@@ -239,9 +199,7 @@ public:
     {
         combo_buff_size.onChange();
         signal.prepare_to_play(sample_rate);
-
-        slider_freq_high.setRange(20, sample_rate / 2, 1);
-        slider_freq_high.repaint();
+        filter_component.prepare_to_play(sample_rate);
     }
 
     void getNextAudioBlock(const AudioSourceChannelInfo& buffer) override
@@ -260,23 +218,17 @@ public:
             area.removeFromTop(theme::margin);
         };
 
-        // === devices ====================================================================
+        // devices
         combo_with_label(combo_dev_types);
         combo_with_label(combo_dev_outputs);
         combo_with_label(combo_dev_rates);
 
-        // === filter =====================================================================
-        auto line = area.removeFromTop(theme::height);
-        checkbox_high_pass.setBounds(line.removeFromLeft(theme::label + theme::margin * 3)); // todo: wtf with margins
-        slider_freq_high.setBounds(line.removeFromLeft(line.getWidth() - (60 + theme::label) - theme::margin * 6));
-        line.removeFromLeft(theme::margin);
-        combo_order.setBounds(line.removeFromLeft(60 + theme::margin));
-        line.removeFromLeft(theme::margin);
-        checkbox_low_pass.setBounds(line);
+        // filter
+        filter_component.setBounds(area.removeFromTop(theme::height));
         area.removeFromTop(theme::margin * 2 + theme::height);
 
         // === middle settings ============================================================
-        line = area.removeFromTop(theme::height);
+        auto line = area.removeFromTop(theme::height);
         line.removeFromLeft(theme::label);
         combo_buff_size.setBounds(line);
         area.removeFromTop(theme::margin);
@@ -351,7 +303,7 @@ public:
         array<String, 3> printed;
         for (auto line = LEFT; line < LEVEL_SIZE; line++)
         {
-            printed.fill("--");
+            printed.fill(theme::empty);
             auto minmax = signal.minmax_get(line);
 
             if (isfinite(rms.at(line)))   printed.at(0) = print(rms.at(line));
@@ -408,21 +360,18 @@ private:
     unique_ptr<circle_>                    history_stat; // [LEFT>RIGHT        ]
     signal_                                signal;
     calibrations_component_                calibrations_component;
+    filter_component_                      filter_component;
     Rectangle<int>                         history_plot;
 
     Label        label_device_type  { {}, "Type"        },
                  label_device       { {}, "Device"      },
                  label_sample_rate  { {}, "Sample rate" },
                  label_buff_size    { {}, "Buff size"   };
-    ToggleButton checkbox_tone      { "Tone"            },
-                 checkbox_high_pass { "High pass"       },
-                 checkbox_low_pass  { "Low pass"        };
+    ToggleButton checkbox_tone      { "Tone"            };
 
     TextButton                     button_zero, button_zero_reset, button_stat_reset;
-    ComboBox                       combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone, combo_order;
-    Slider                         slider_freq_high;
+    ComboBox                       combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
     theme::checkbox_right_text_lf_ theme_right_text;
-    theme::checkbox_right_lf_      theme_right;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_component_)
 };
