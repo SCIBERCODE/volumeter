@@ -38,7 +38,7 @@ public:
         for (auto const item : buff_size_list)
             combo_buff_size.addItem(prefix(item, "s", 0), static_cast<int>(item * 1000));
 
-        combo_buff_size.setSelectedId(_opt->load_int("combo_buff_size"));
+        combo_buff_size.setSelectedId(_opt->get_int("combo_buff_size"));
         combo_buff_size.onChange = [this]
         {
             auto value = combo_buff_size.getSelectedId();
@@ -46,7 +46,7 @@ public:
             _opt->save("combo_buff_size", value);
         };
 
-        checkbox_tone.setToggleState(_opt->load_int("checkbox_tone"), dontSendNotification);
+        checkbox_tone.setToggleState(_opt->get_int("checkbox_tone"), dontSendNotification);
         checkbox_tone.setLookAndFeel(&theme_right_text);
         checkbox_tone.onClick = [this]
         {
@@ -56,7 +56,7 @@ public:
         for (auto const item : tone_list)
             combo_tone.addItem(prefix(item, "Hz", 0), item);
 
-        combo_tone.setSelectedId(_opt->load_int("combo_tone"));
+        combo_tone.setSelectedId(_opt->get_int("combo_tone"));
         combo_tone.onChange = [this]
         {
             auto value = combo_tone.getSelectedId();
@@ -72,7 +72,6 @@ public:
                 auto label = make_unique<Label>(String(), column == LABEL ? stat_captions.at(line) : String());
                 addAndMakeVisible(label.get());
                 labels_stat.at(line).at(column) = move(label);
-                
             }
             auto label_value = labels_stat.at(line).at(VALUE).get();
             labels_stat.at(line).at(LABEL) ->attachToComponent(label_value, true);
@@ -132,7 +131,7 @@ public:
                 auto name_type = types.getUnchecked(i)->getTypeName();
                 combo_dev_types.addItem(name_type, i + 1);
 
-                if (name_type == _opt->load_text("combo_dev_type"))
+                if (name_type == _opt->get_text("combo_dev_type"))
                     index = i;
             }
 
@@ -147,7 +146,7 @@ public:
                     const StringArray devs(type->getDeviceNames());
                     combo_dev_outputs.clear(dontSendNotification);
 
-                    auto device = _opt->load_text("combo_dev_output");
+                    auto device = _opt->get_text("combo_dev_output");
 
                     for (int i = 0; i < devs.size(); ++i) {
                         combo_dev_outputs.addItem(devs[i], i + 1);
@@ -165,7 +164,7 @@ public:
             signal.minmax_clear();
 
             _opt->save("combo_dev_output", combo_dev_outputs.getText());
-            auto sample_rate = _opt->load_int("combo_dev_rate");
+            auto sample_rate = _opt->get_int("combo_dev_rate");
 
             auto config                     = deviceManager.getAudioDeviceSetup();
             config.outputDeviceName         = combo_dev_outputs.getText();
@@ -248,8 +247,8 @@ public:
         area.removeFromBottom(theme::margin);
         button_zero_reset.setBounds(area.removeFromBottom(theme::height));
         area.removeFromBottom(theme::margin);
-        button_zero.setBounds(area.removeFromBottom(theme::height));        
-        
+        button_zero.setBounds(area.removeFromBottom(theme::height));
+
         auto remain = area;
         area.removeFromLeft(theme::label);
         auto right = area.removeFromRight(getWidth() / 2);
@@ -319,14 +318,6 @@ public:
         if (button_zero_reset.isEnabled() == calibrate) button_zero_reset.setEnabled(!calibrate);
     }
 
-    float freq2pos(float freq) {
-        return jmap(
-            std::log(freq),
-            std::log(20.0f), std::log(20000.0f),
-            0.0f, static_cast<float>(history_plot.getWidth())
-        ) + history_plot.getX();
-    }
-
     void paint(Graphics& g) override {
         g.setColour(Colours::white);
         g.fillRect(history_plot);
@@ -334,22 +325,23 @@ public:
         g.drawRect(history_plot);
         g.setColour(Colours::black);
 
-        Path path;
         float offset = 0;
-
         float value;
         if (history_stat->get_first_value(LEFT, history_plot.getWidth(), value))
+        {
+            Path path;
             do {
+                if (!isfinite(value)) break;
                 auto x = history_plot.getRight() - offset++;
                 auto y = abs(value * (history_plot.getHeight() / 130.0f)) + history_plot.getY();
                 if (path.isEmpty())
                     path.startNewSubPath(x, y);
 
                 path.lineTo(x, y);
-            } 
+            }
             while (history_stat->get_next_value(value));
-
-        g.strokePath(path, PathStrokeType(1.0f));
+            g.strokePath(path, PathStrokeType(1.0f));
+        }
     }
 
 //=========================================================================================
@@ -372,6 +364,6 @@ private:
     TextButton                     button_zero, button_zero_reset, button_stat_reset;
     ComboBox                       combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
     theme::checkbox_right_text_lf_ theme_right_text;
-    
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_component_)
 };

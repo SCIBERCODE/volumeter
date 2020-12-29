@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 #include <JuceHeader.h>
 #include "signal.h"
 
@@ -12,7 +12,7 @@ public:
     calibrations_component_(signal_& _signal) : signal(_signal)
     {
         addAndMakeVisible(checkbox_cal);
-        checkbox_cal.setToggleState(_opt->load_int("checkbox_cal"), dontSendNotification);
+        checkbox_cal.setToggleState(_opt->get_int("checkbox_cal"), dontSendNotification);
         checkbox_cal.onClick = [this]
         {
             _opt->save("checkbox_cal", checkbox_cal.getToggleState());
@@ -51,7 +51,7 @@ public:
         for (auto const& pref : _prefs)
             combo_prefix.addItem(pref.second + "V", pref.first + 1);
 
-        combo_prefix.setSelectedId(_opt->load_int("combo_prefix") + 1);
+        combo_prefix.setSelectedId(_opt->get_int("combo_prefix") + 1);
         combo_prefix.onChange = [this]
         {
             _opt->save("combo_prefix", combo_prefix.getSelectedId() - 1);
@@ -66,14 +66,14 @@ public:
                 editor_cal_channels.at(RIGHT).getText()
             };
             if (channels_text.at(LEFT).isEmpty() || channels_text.at(RIGHT).isEmpty()) return;
-            auto pref = _opt->load_int("combo_prefix");
+            auto pref = _opt->get_int("combo_prefix");
             array<double, 2> channels
             {
                 channels_text.at(LEFT) .getDoubleValue() * pow(10.0, pref),
                 channels_text.at(RIGHT).getDoubleValue() * pow(10.0, pref)
             };
 
-            auto cals = _opt->load_xml("table_cals");
+            auto cals = _opt->get_xml("table_cals");
             if (cals == nullptr)
                 cals = make_unique<XmlElement>("ROWS");
 
@@ -98,7 +98,7 @@ public:
     void update()
     {
         rows.clear();
-        auto cals = _opt->load_xml("table_cals");
+        auto cals = _opt->get_xml("table_cals");
         if (cals != nullptr) {
             forEachXmlChildElement(*cals, el)
             {
@@ -111,7 +111,7 @@ public:
                 });
             }
         }
-        selected = _opt->load_int("table_cals_row");
+        selected = _opt->get_int("table_cals_row");
         table_cals.updateContent();
     };
 
@@ -225,7 +225,7 @@ public:
         }
         table_cals.updateContent();
 
-        auto cals = _opt->load_xml("table_cals");
+        auto cals = _opt->get_xml("table_cals");
         if (cals == nullptr) {
             cals = make_unique<XmlElement>("ROWS");
             cals->createNewChildElement("SELECTION")->setAttribute("cal_index", -1);

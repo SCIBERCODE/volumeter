@@ -42,7 +42,7 @@ enum labels_stat_column_t : size_t {
 
 template <typename T>
 void operator ++(T& value, int)
-{ 
+{
     value = static_cast<T>(value + 1);
 }
 
@@ -80,7 +80,7 @@ protected:
             toFront(true);
         }
 
-        void closeButtonPressed() override 
+        void closeButtonPressed() override
         {
             app.systemRequestedQuit();
         }

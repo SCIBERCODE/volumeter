@@ -19,26 +19,34 @@ public:
     {
         reset();
     }
+
     void set_sample_rate(double sample_rate) {
         sampling_rate = sample_rate;
     }
+
     void reset() {
-        angles.fill(0.0);
+        angle.fill(0.0);
     }
+
     void set_freq(float frequency) {
         freq = frequency;
         auto cycles_per_sample = frequency / sampling_rate;
-        angle_delta = cycles_per_sample * 2.0 * 3.14159265358979323846;
+        angle_delta = cycles_per_sample * 2.0 * M_PI;
     }
+
     auto sample(level_t channel) {
-        auto current_sample = sin(angles.at(channel));
-        angles.at(channel) += angle_delta;
+        auto current_sample = sin(angle.at(channel));
+        angle.at(channel) += angle_delta;
+
+        if (angle.at(channel) > 2.0 * M_PI)
+            angle.at(channel) -= 2.0 * M_PI;
+
         return static_cast<float>(current_sample);
     }
 
 private:
     double           sampling_rate, freq, angle_delta;
-    array<double, 2> angles;
+    array<double, 2> angle;
 };
 
 //=========================================================================================
@@ -90,7 +98,7 @@ public:
         for (size_t k = 0; k < max_size; ++k)
         {
             auto sample = buffer.at(channel)[k];
-            if (isfinite(sample) && sample) {
+            if (isfinite(sample)) {
                 sum += sample;
                 size++;
             }
@@ -99,7 +107,7 @@ public:
     }
 
     bool get_first_value(level_t channel, size_t size, float& value) {
-        if (size == 0 || size > max_size)
+        if (size == 0 || size > max_size || tail.at(channel) == 0)
             return false;
 
         it.pointer = tail.at(channel) - 1;
@@ -134,7 +142,9 @@ class signal_
 {
 public:
 
-    signal_() : sample_rate(0.0), order(120)
+    signal_() :
+        sample_rate(_opt->get_int("sample_rate")),
+        order      (_opt->get_int("order"))
     {
         zero.fill(0.0);
         minmax_clear();
@@ -209,16 +219,16 @@ public:
         lock_guard<mutex> locker(audio_process);
         for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
-            if (_opt->load_int("use_pass_high"))
+            if (_opt->get_int("pass_high"))
             {
                 iir_coeff high_pass(order, filter_type::high);
                 butterworth_iir(high_pass, 20.0 / sample_rate, 3.0);
                 filter.at(channel).at(HIGH_PASS) = make_unique<iir<float_type, float_type>>(high_pass);
             }
-            if (_opt->load_int("use_pass_low"))
+            if (_opt->get_int("pass_low"))
             {
                 iir_coeff low_pass(order, filter_type::low);
-                butterworth_iir(low_pass, _opt->load_int("use_pass_low") / sample_rate, 3.0);
+                butterworth_iir(low_pass, _opt->get_int("pass_low_value") / sample_rate, 3.0);
                 filter.at(channel).at(LOW_PASS) = make_unique<iir<float_type, float_type>>(low_pass);
             }
         }
@@ -229,7 +239,7 @@ public:
         sample_rate = sample_rate_;
 
         osc.set_sample_rate(sample_rate);
-        osc.set_freq(static_cast<float>(_opt->load_int("tone_value")));
+        osc.set_freq(static_cast<float>(_opt->get_int("tone_value")));
         osc.reset();
 
         filter_init();
@@ -237,15 +247,15 @@ public:
 
     void next_audio_block(const AudioSourceChannelInfo& buffer)
     {
-        if (audio_process.try_lock())
+        if (audio_process.try_lock()) // todo: битый буфер не норм, сигнализировать, что не тянет проц текущих настроек
         {
             if (buff)
             {
                 auto read          = buffer.buffer->getArrayOfReadPointers();
                 auto write         = buffer.buffer->getArrayOfWritePointers();
-                auto use_high_pass = _opt->load_int("use_pass_high") && filter.at(HIGH_PASS).at(LEFT) && filter.at(HIGH_PASS).at(RIGHT);
-                auto use_low_pass  = _opt->load_int("use_pass_low")  && filter.at(LOW_PASS ).at(LEFT) && filter.at(LOW_PASS ).at(RIGHT);
-                auto use_tone      = _opt->load_int("tone");
+                auto use_high_pass = _opt->get_int("pass_high") && filter.at(LEFT).at(HIGH_PASS) && filter.at(RIGHT).at(HIGH_PASS);
+                auto use_low_pass  = _opt->get_int("pass_low")  && filter.at(LEFT).at(LOW_PASS)  && filter.at(RIGHT).at(LOW_PASS);
+                auto use_tone      = _opt->get_int("tone");
 
                 for (auto channel = LEFT; channel <= RIGHT; channel++)
                     for (auto sample_index = 0; sample_index < buffer.numSamples; ++sample_index)
@@ -257,7 +267,7 @@ public:
                             if (use_high_pass) sample = filter.at(channel).at(HIGH_PASS)->clock(sample);
                             if (use_low_pass)  sample = filter.at(channel).at(LOW_PASS )->clock(sample);
                             write[channel][sample_index] = static_cast<float>(sample);
-                        }                        
+                        }
                     }
 
                 if (!use_high_pass && !use_low_pass && !use_tone)

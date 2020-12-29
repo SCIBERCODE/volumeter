@@ -8,21 +8,21 @@ protected:
     };
 
     const map<String, option> options = {
-        { "combo_dev_type",     { "device_type",    "ASIO"  } },
-        { "combo_dev_output",   { "device",         ""      } },
-        { "combo_dev_rate",     { "sample_rate",    "48000" } },
-        { "checkbox_high_pass", { "use_pass_high",  "0"     } },
-        { "checkbox_low_pass",  { "use_pass_low",   "0"     } },
-        { "slider_freq_high",   { "pass_low_value", "15000" } },
-        { "combo_order",        { "order",          "120"   } },
-        { "combo_buff_size",    { "buff_size",      "500"   } },
-        { "checkbox_tone",      { "tone",           "0"     } },
-        { "combo_tone",         { "tone_value",     "1000"  } },
+        { "combo_dev_type",     { "device_type",        "ASIO"  } },
+        { "combo_dev_output",   { "device",             ""      } },
+        { "combo_dev_rate",     { "sample_rate",        "44100" } },
+        { "checkbox_high_pass", { "pass_high",          "0"     } },
+        { "checkbox_low_pass",  { "pass_low",           "0"     } },
+        { "slider_freq_high",   { "pass_low_value",     "15000" } },
+        { "combo_order",        { "order",              "120"   } },
+        { "combo_buff_size",    { "buff_size",          "500"   } },
+        { "checkbox_tone",      { "tone",               "0"     } },
+        { "combo_tone",         { "tone_value",         "1000"  } },
         // calibrations component
-        { "checkbox_cal",       { "calibrate",      "0"     } },
-        { "combo_prefix",       { "prefix",         "0"     } },
-        { "table_cals",         { "calibrations",   ""      } },
-        { "table_cals_row",     { "cal_index",      "-1"    } }
+        { "checkbox_cal",       { "calibrate",          "0"     } },
+        { "combo_prefix",       { "prefix",             "0"     } },
+        { "table_cals",         { "calibrations",       ""      } },
+        { "table_cals_row",     { "calibrations_index", "-1"    } }
     };
 
 public:
@@ -44,7 +44,7 @@ public:
         }
     }
 
-    String load_text(const String& component_name) {
+    String get_text(const String& component_name) {
         if (key_exists(component_name))
             return settings.getUserSettings()->getValue
             (
@@ -55,11 +55,11 @@ public:
         return String();
     }
 
-    int load_int(const String& component_name) {
-        return key_exists(component_name) ? load_text(get_key(component_name)).getIntValue() : 0;
+    int get_int(const String& component_name) {
+        return key_exists(component_name) ? get_text(get_key(component_name)).getIntValue() : 0;
     }
 
-    auto load_xml(const String& component_name) {
+    auto get_xml(const String& component_name) {
         if (key_exists(component_name))
             return settings.getUserSettings()->getXmlValue(options.at(get_key(component_name)).xml_name);
 
@@ -67,6 +67,8 @@ public:
     }
 
 private:
+    // ищем по имени контрола, потому как преимущественно настройки запрашивает гуй
+    // после глядим в именах опций непосредственно использующихся в файле конфига
     String get_key(const String& request) {
         if (options.count(request) > 0)
             return request;
