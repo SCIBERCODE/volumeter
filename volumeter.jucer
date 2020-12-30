@@ -2,9 +2,15 @@
 
 <JUCERPROJECT id="aq6Tsq" name="volumeter" projectType="guiapp" useAppConfig="0"
               addUsingNamespaceToJuceHeader="1" jucerFormatVersion="1" compilerFlagSchemes="NewScheme"
-              cppLanguageStandard="17" displaySplashScreen="0" headerPath="..\..\Libs\asio_sdk\common\&#10;..\..\Libs\">
+              cppLanguageStandard="17" displaySplashScreen="0" headerPath="..\..\Libs\asio_sdk\&#10;..\..\Libs\">
   <MAINGROUP id="US7HFq" name="volumeter">
-    <GROUP id="{4D1FF0D6-F97F-78FF-33FC-9D81D7CAB011}" name="Source">
+    <GROUP id="{00D53163-FEA8-1EE6-F0D4-44267AA62E95}" name="filters">
+      <FILE id="ju03aP" name="butterworth_iir.cpp" compile="1" resource="0"
+            file="Libs/spuce/filters/butterworth_iir.cpp"/>
+      <FILE id="Zq3Gsq" name="find_roots.cpp" compile="1" resource="0" file="Libs/spuce/filters/find_roots.cpp"/>
+      <FILE id="N2JfGA" name="iir_coeff.cpp" compile="1" resource="0" file="Libs/spuce/filters/iir_coeff.cpp"/>
+    </GROUP>
+    <GROUP id="{4D1FF0D6-F97F-78FF-33FC-9D81D7CAB011}" name="source">
       <FILE id="FYAWgD" name="gui.h" compile="0" resource="0" file="Source/gui.h"/>
       <FILE id="qEaw0o" name="gui_cals.h" compile="0" resource="0" file="Source/gui_cals.h"/>
       <FILE id="dZq3WU" name="gui_filter.h" compile="0" resource="0" file="Source/gui_filter.h"/>

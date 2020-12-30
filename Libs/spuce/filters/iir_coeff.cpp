@@ -81,7 +81,7 @@ iir_coeff::iir_coeff(size_t ord, filter_type lp)
   odd = (order % 2);
   // Put at fs/4
   center_freq = 0.25;
-  c0 = cos(center_freq*2*M_PI); 
+  c0 = cos(center_freq*2*M_PI);
   for (size_t j = 0; j < n2; j++) {
     poles[j] = std::complex<float_type>(0.0, 0.0);
     zeros[j] = std::complex<float_type>(0.0, 0.0);
@@ -110,7 +110,7 @@ void iir_coeff::set_bandpass_gain() {
 
 void iir_coeff::make_band(float_type c) {
   center_freq = c;
-  c0 = cos(center_freq*2*M_PI); 
+  c0 = cos(center_freq*2*M_PI);
   std::vector<std::complex<float_type> > old_poles;
   std::vector<std::complex<float_type> > old_zeros;
 
