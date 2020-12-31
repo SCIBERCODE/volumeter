@@ -1,4 +1,4 @@
-#include <JuceHeader.h>
+﻿#include <JuceHeader.h>
 
 using namespace std;
 
@@ -15,15 +15,15 @@ application_::~application_() {
     _opt.reset();
 }
 
-const String application_::getApplicationName()    { return "rms_volumeter"; }
-const String application_::getApplicationVersion() { return __DATE__;        }
-void application_::shutdown()                      { main_window = nullptr;  }
-bool application_::moreThanOneInstanceAllowed()    { return true;            }
+const String application_::getApplicationName()    { return L"rms_volumeter"; }
+const String application_::getApplicationVersion() { return __DATE__;         }
+void application_::shutdown()                      { main_window = nullptr;   }
+bool application_::moreThanOneInstanceAllowed()    { return true;             }
 
 void application_::initialise(const String&)
 {
     Desktop::getInstance().setDefaultLookAndFeel(&theme);
-    main_window = make_unique<main_window_>("rms volumeter", new main_component_(), *this);
+    main_window = make_unique<main_window_>(L"rms volumeter", new main_component_(), *this);
 }
 
 String prefix(double value, String unit, size_t numder_of_decimals)
@@ -31,7 +31,7 @@ String prefix(double value, String unit, size_t numder_of_decimals)
     auto   symbol    = String();
     double new_value = value;
 
-    auto exp = (int)(floor(log10(value) / 3.0) * 3.0);
+    auto exp = static_cast<int>(floor(log10(value) / 3.0) * 3.0);
     if (_prefs.count(exp))
     {
         symbol = _prefs.at(exp);
@@ -42,11 +42,11 @@ String prefix(double value, String unit, size_t numder_of_decimals)
             exp += 3;
         }
     }
-    return String(new_value, (int)numder_of_decimals) + " " + symbol + unit;
+    return String(new_value, static_cast<int>(numder_of_decimals)) + L" " + symbol + unit;
 }
 
 String prefix_v(double value) {
-    return prefix(value, "V", 5);
+    return prefix(value, L"V", 5);
 }
 
 START_JUCE_APPLICATION(application_)

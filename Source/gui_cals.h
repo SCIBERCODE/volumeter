@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <JuceHeader.h>
 #include "signal.h"
 
@@ -12,10 +12,10 @@ public:
     calibrations_component_(signal_& _signal) : signal(_signal)
     {
         addAndMakeVisible(checkbox_cal);
-        checkbox_cal.setToggleState(_opt->get_int("checkbox_cal"), dontSendNotification);
+        checkbox_cal.setToggleState(_opt->get_int(L"checkbox_cal"), dontSendNotification);
         checkbox_cal.onClick = [this]
         {
-            _opt->save("checkbox_cal", checkbox_cal.getToggleState());
+            _opt->save(L"checkbox_cal", checkbox_cal.getToggleState());
             signal.minmax_clear(); // todo: сохранять статистику, переводя в вольты
         };
 
@@ -29,12 +29,12 @@ public:
         table_cals.setRowHeight(20);
         table_cals.getViewport()->setScrollBarsShown(true, false);
 
-        int id = 1;
+        size_t id = 1;
         for (auto const& column : columns)
             table_cals.getHeader().addColumn(column.header, id++, column.width, 30, -1, TableHeaderComponent::notSortable);
 
         addAndMakeVisible(label_cal_add);
-        addAndMakeVisible(editor_cal_name);
+        addAndMakeVisible(editor_cal_name); // todo: национальные символы
         addAndMakeVisible(label_cal_channels);
         addAndMakeVisible(editor_cal_channels.at(LEFT));
         addAndMakeVisible(editor_cal_channels.at(RIGHT));
@@ -43,21 +43,21 @@ public:
 
         label_cal_add.attachToComponent(&editor_cal_name, true);
         label_cal_channels.attachToComponent(&editor_cal_channels.at(LEFT), true);
-        editor_cal_name.setTextToShowWhenEmpty("Calibration Name (optional)", Colours::grey);
-        editor_cal_channels.at(LEFT) .setTextToShowWhenEmpty("0.0", Colours::grey); // todo: change hint according to selected pref
-        editor_cal_channels.at(RIGHT).setTextToShowWhenEmpty("0.0", Colours::grey);
-        editor_cal_channels.at(LEFT) .setInputRestrictions(0, "0123456789.");
-        editor_cal_channels.at(RIGHT).setInputRestrictions(0, "0123456789.");
+        editor_cal_name.setTextToShowWhenEmpty(L"Calibration Name (optional)", Colours::grey);
+        editor_cal_channels.at(LEFT) .setTextToShowWhenEmpty(L"0.0", Colours::grey); // todo: change hint according to selected pref
+        editor_cal_channels.at(RIGHT).setTextToShowWhenEmpty(L"0.0", Colours::grey);
+        editor_cal_channels.at(LEFT) .setInputRestrictions(0, L"0123456789.");
+        editor_cal_channels.at(RIGHT).setInputRestrictions(0, L"0123456789.");
         for (auto const& pref : _prefs)
-            combo_prefix.addItem(pref.second + "V", pref.first + 1);
+            combo_prefix.addItem(pref.second + L"V", pref.first + 1);
 
-        combo_prefix.setSelectedId(_opt->get_int("combo_prefix") + 1);
+        combo_prefix.setSelectedId(_opt->get_int(L"combo_prefix") + 1);
         combo_prefix.onChange = [this]
         {
-            _opt->save("combo_prefix", combo_prefix.getSelectedId() - 1);
+            _opt->save(L"combo_prefix", combo_prefix.getSelectedId() - 1);
         };
 
-        button_cal_add.setButtonText("Add");
+        button_cal_add.setButtonText(L"Add");
         button_cal_add.onClick = [=]
         {
             array<String, 2> channels_text
@@ -66,27 +66,27 @@ public:
                 editor_cal_channels.at(RIGHT).getText()
             };
             if (channels_text.at(LEFT).isEmpty() || channels_text.at(RIGHT).isEmpty()) return;
-            auto pref = _opt->get_int("combo_prefix");
+            auto pref = _opt->get_int(L"combo_prefix");
             array<double, 2> channels
             {
                 channels_text.at(LEFT) .getDoubleValue() * pow(10.0, pref),
                 channels_text.at(RIGHT).getDoubleValue() * pow(10.0, pref)
             };
 
-            auto cals = _opt->get_xml("table_cals");
+            auto cals = _opt->get_xml(L"table_cals");
             if (cals == nullptr)
-                cals = make_unique<XmlElement>("ROWS");
+                cals = make_unique<XmlElement>(StringRef(L"ROWS"));
 
-            auto* e  = cals->createNewChildElement("ROW");
+            auto* e  = cals->createNewChildElement(StringRef(L"ROW"));
             auto rms = signal.get_rms();
 
-            e->setAttribute("name",        editor_cal_name.getText());
-            e->setAttribute("left",        channels.at(LEFT));
-            e->setAttribute("left_coeff",  channels.at(LEFT)  / rms.at(LEFT));
-            e->setAttribute("right",       channels.at(RIGHT));
-            e->setAttribute("right_coeff", channels.at(RIGHT) / rms.at(RIGHT)); // todo: check for nan
+            e->setAttribute(Identifier(L"name"),        editor_cal_name.getText());
+            e->setAttribute(Identifier(L"left"),        channels.at(LEFT));
+            e->setAttribute(Identifier(L"left_coeff"),  channels.at(LEFT)  / rms.at(LEFT));
+            e->setAttribute(Identifier(L"right"),       channels.at(RIGHT));
+            e->setAttribute(Identifier(L"right_coeff"), channels.at(RIGHT) / rms.at(RIGHT)); // todo: check for nan
 
-            _opt->save("table_cals", cals.get());
+            _opt->save(L"table_cals", cals.get());
             update();
         };
     }
@@ -98,20 +98,20 @@ public:
     void update()
     {
         rows.clear();
-        auto cals = _opt->get_xml("table_cals");
+        auto cals = _opt->get_xml(L"table_cals");
         if (cals != nullptr) {
             forEachXmlChildElement(*cals, el)
             {
                 rows.push_back(cal_t{
-                    el->getStringAttribute("name"),
-                    el->getDoubleAttribute("left"),
-                    el->getDoubleAttribute("right"),
-                    el->getDoubleAttribute("left_coeff"),
-                    el->getDoubleAttribute("right_coeff")
+                    el->getStringAttribute(Identifier(L"name")),
+                    el->getDoubleAttribute(Identifier(L"left")),
+                    el->getDoubleAttribute(Identifier(L"right")),
+                    el->getDoubleAttribute(Identifier(L"left_coeff")),
+                    el->getDoubleAttribute(Identifier(L"right_coeff"))
                 });
             }
         }
-        selected = _opt->get_int("table_cals_row");
+        selected = _opt->get_int(L"table_cals_row");
         table_cals.updateContent();
     };
 
@@ -130,7 +130,7 @@ public:
     void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на заголовке
         auto current = table_cals.getSelectedRow();
         selected = current == selected ? -1 : current;
-        _opt->save("table_cals_row", selected);
+        _opt->save(L"table_cals_row", selected);
         repaint();
     }
 
@@ -160,8 +160,8 @@ public:
 
         switch (data_selector) {
         case cell_data_t::name:  text = rows.at(row).name;                     break;
-        case cell_data_t::left:  text = prefix(rows.at(row).channel.at(LEFT),  "V", 0); break;
-        case cell_data_t::right: text = prefix(rows.at(row).channel.at(RIGHT), "V", 0); break;
+        case cell_data_t::left:  text = prefix(rows.at(row).channel.at(LEFT),  L"V", 0); break;
+        case cell_data_t::right: text = prefix(rows.at(row).channel.at(RIGHT), L"V", 0); break;
         }
 
         auto text_color = getLookAndFeel().findColour(ListBox::textColourId);
@@ -176,17 +176,17 @@ public:
         auto area = getLocalBounds();
         area.removeFromBottom(theme::margin);
         auto bottom = area.removeFromBottom(theme::height * 2 + theme::margin);
-        button_cal_add.setBounds(bottom.removeFromRight(theme::label).withTrimmedLeft(theme::margin));
+        button_cal_add.setBounds(bottom.removeFromRight(theme::label_width).withTrimmedLeft(theme::margin));
         auto line = bottom.removeFromBottom(theme::height);
-        line.removeFromLeft(theme::label);
-        int edit_width = (line.getWidth() - theme::label) / 2;
+        line.removeFromLeft(theme::label_width);
+        int edit_width = (line.getWidth() - theme::label_width) / 2;
         editor_cal_channels.at(LEFT).setBounds(line.removeFromLeft(edit_width));
         line.removeFromLeft(theme::margin);
         editor_cal_channels.at(RIGHT).setBounds(line.removeFromLeft(edit_width));
         line.removeFromLeft(theme::margin);
         combo_prefix.setBounds(line);
         bottom.removeFromBottom(theme::margin);
-        bottom.removeFromLeft(theme::label);
+        bottom.removeFromLeft(theme::label_width);
         editor_cal_name.setBounds(bottom.removeFromBottom(theme::height));
         area.removeFromBottom(theme::margin);
         checkbox_cal.setBounds(area.removeFromTop(theme::height));
@@ -216,32 +216,32 @@ public:
         if (selected == del_row)
         {
             selected = -1;
-            _opt->save("table_cals_row", selected);
+            _opt->save(L"table_cals_row", selected);
         }
         else if (del_row < selected)
         {
             selected--;
-            _opt->save("table_cals_row", selected);
+            _opt->save(L"table_cals_row", selected);
         }
         table_cals.updateContent();
 
-        auto cals = _opt->get_xml("table_cals");
+        auto cals = _opt->get_xml(L"table_cals");
         if (cals == nullptr) {
-            cals = make_unique<XmlElement>("ROWS");
-            cals->createNewChildElement("SELECTION")->setAttribute("cal_index", -1);
+            cals = make_unique<XmlElement>(StringRef(L"ROWS"));
+            cals->createNewChildElement(StringRef(L"SELECTION"))->setAttribute(Identifier(L"cal_index"), -1);
         }
         cals->deleteAllChildElements();
 
         for (const auto& row : rows)
         {
-            auto* e = cals->createNewChildElement("ROW");
-            e->setAttribute("name",        row.name);
-            e->setAttribute("left",        row.channel.at(LEFT));
-            e->setAttribute("left_coeff",  row.coeff.at(LEFT));
-            e->setAttribute("right",       row.channel.at(RIGHT));
-            e->setAttribute("right_coeff", row.coeff.at(RIGHT));
+            auto* e = cals->createNewChildElement(StringRef(L"ROW"));
+            e->setAttribute(Identifier(L"name"),        row.name);
+            e->setAttribute(Identifier(L"left"),        row.channel.at(LEFT));
+            e->setAttribute(Identifier(L"left_coeff"),  row.coeff.at  (LEFT));
+            e->setAttribute(Identifier(L"right"),       row.channel.at(RIGHT));
+            e->setAttribute(Identifier(L"right_coeff"), row.coeff.at  (RIGHT));
         }
-        _opt->save("table_cals", cals.get());
+        _opt->save(L"table_cals", cals.get());
     }
 
 //=========================================================================================
@@ -252,15 +252,15 @@ protected:
     struct column_t
     {
         cell_data_t type;
-        char*       header;
-        uint16_t    width;
+        wchar_t    *header;
+        size_t      width;
     };
     const vector<column_t> columns =
     {
-        { cell_data_t::name,   "Name",  300 },
-        { cell_data_t::left,   "Left",  100 },
-        { cell_data_t::right,  "Right", 100 },
-        { cell_data_t::button, "",      30  },
+        { cell_data_t::name,   L"Name",  300 },
+        { cell_data_t::left,   L"Left",  100 },
+        { cell_data_t::right,  L"Right", 100 },
+        { cell_data_t::button, L"",      30  },
     };
 
     struct cal_t
@@ -276,7 +276,7 @@ protected:
         _table_custom_button(calibrations_component_& td) : owner(td)
         {
             addAndMakeVisible(button);
-            button.setButtonText("X");
+            button.setButtonText(L"X");
             button.setConnectedEdges(TextButton::ConnectedOnBottom | TextButton::ConnectedOnLeft | TextButton::ConnectedOnRight | TextButton::ConnectedOnTop);
             button.onClick = [this]
             {
@@ -308,9 +308,9 @@ private:
     TextEditor           editor_cal_name;
     ComboBox             combo_prefix;
     TextButton           button_cal_add;
-    Label                label_cal_add      { {}, "Name"            },
-                         label_cal_channels { {}, "Left/Right"      };
-    ToggleButton         checkbox_cal       {     "Use Calibration" };
+    Label                label_cal_add      { {}, L"Name"            },
+                         label_cal_channels { {}, L"Left/Right"      };
+    ToggleButton         checkbox_cal       {     L"Use Calibration" };
 
     String getAttributeNameForColumnId(const int columnId) const
     {

@@ -36,36 +36,36 @@ public:
 
         label_buff_size.attachToComponent(&combo_buff_size, true);
         for (auto const item : buff_size_list)
-            combo_buff_size.addItem(prefix(item, "s", 0), static_cast<int>(item * 1000));
+            combo_buff_size.addItem(prefix(item, L"s", 0), static_cast<int>(item * 1000));
 
-        combo_buff_size.setSelectedId(_opt->get_int("combo_buff_size"));
+        combo_buff_size.setSelectedId(_opt->get_int(L"combo_buff_size"));
         combo_buff_size.onChange = [this]
         {
             auto value = combo_buff_size.getSelectedId();
             signal.change_buff_size(value);
-            _opt->save("combo_buff_size", value);
+            _opt->save(L"combo_buff_size", value);
         };
 
-        checkbox_tone.setToggleState(_opt->get_int("checkbox_tone"), dontSendNotification);
+        checkbox_tone.setToggleState(_opt->get_int(L"checkbox_tone"), dontSendNotification);
         checkbox_tone.setLookAndFeel(&theme_right_text);
         checkbox_tone.onClick = [this]
         {
             signal.minmax_clear();
-            _opt->save("checkbox_tone", checkbox_tone.getToggleState());
+            _opt->save(L"checkbox_tone", checkbox_tone.getToggleState());
         };
         for (auto const item : tone_list)
-            combo_tone.addItem(prefix(item, "Hz", 0), item);
+            combo_tone.addItem(prefix(item, L"Hz", 0), item);
 
-        combo_tone.setSelectedId(_opt->get_int("combo_tone"));
+        combo_tone.setSelectedId(_opt->get_int(L"combo_tone"));
         combo_tone.onChange = [this]
         {
             auto value = combo_tone.getSelectedId();
             signal.set_freq(value);
-            _opt->save("combo_tone", value);
+            _opt->save(L"combo_tone", value);
         };
 
         // === stat =======================================================================
-        const array<String, 3> stat_captions = { "Left", "Right", "Balance" }; // todo: хорошо бы по точке центровать цифры
+        const array<String, 3> stat_captions = { L"Left", L"Right", L"Balance" }; // todo: хорошо бы по точке центровать цифры
         for (auto line = LEFT; line < LEVEL_SIZE; line++) {
             for (auto column = LABEL; column < LABELS_STAT_COLUMN_SIZE; column++)
             {
@@ -80,22 +80,27 @@ public:
         }
 
         addAndMakeVisible(button_zero);
-        addAndMakeVisible(button_zero_reset);
         addAndMakeVisible(button_stat_reset);
 
-        button_zero.setButtonText      ("Set zero"  );
-        button_zero_reset.setButtonText("Reset zero");
-        button_stat_reset.setButtonText("Reset stat");
+        button_zero.setButtonText(L"Set zero");
+        button_stat_reset.setButtonText(L"Reset stat");
 
-        button_zero.onClick       = [this] { signal.zero_set();     };
-        button_zero_reset.onClick = [this] { signal.zero_clear();   };
+        button_zero.setClickingTogglesState(true);
+        button_zero.onClick = [this]
+        {
+            if (button_zero.getToggleState())
+                signal.zero_set();
+            else
+                signal.zero_clear();
+        };
+
         button_stat_reset.onClick = [this] { signal.minmax_clear(); };
 
         addAndMakeVisible(filter_component);
         addAndMakeVisible(calibrations_component);
         calibrations_component.update();
 
-        setSize(430, 780);
+        setSize(430, 680);
         startTimer(100);
 
         setAudioChannels(2, 2);
@@ -131,14 +136,14 @@ public:
                 auto name_type = types.getUnchecked(i)->getTypeName();
                 combo_dev_types.addItem(name_type, i + 1);
 
-                if (name_type == _opt->get_text("combo_dev_type"))
+                if (name_type == _opt->get_text(L"combo_dev_type"))
                     index = i;
             }
 
             combo_dev_types.setSelectedItemIndex(index);
             combo_dev_types.onChange = [this]
             {
-                _opt->save("combo_dev_type", combo_dev_types.getText());
+                _opt->save(L"combo_dev_type", combo_dev_types.getText());
                 auto type = deviceManager.getAvailableDeviceTypes()[combo_dev_types.getSelectedId() - 1];
                 if (type)
                 {
@@ -146,7 +151,7 @@ public:
                     const StringArray devs(type->getDeviceNames());
                     combo_dev_outputs.clear(dontSendNotification);
 
-                    auto device = _opt->get_text("combo_dev_output");
+                    auto device = _opt->get_text(L"combo_dev_output");
 
                     for (int i = 0; i < devs.size(); ++i) {
                         combo_dev_outputs.addItem(devs[i], i + 1);
@@ -163,8 +168,8 @@ public:
             signal.clear_data();
             signal.minmax_clear();
 
-            _opt->save("combo_dev_output", combo_dev_outputs.getText());
-            auto sample_rate = _opt->get_int("combo_dev_rate");
+            _opt->save(L"combo_dev_output", combo_dev_outputs.getText());
+            auto sample_rate = _opt->get_int(L"combo_dev_rate");
 
             auto config                     = deviceManager.getAudioDeviceSetup();
             config.outputDeviceName         = combo_dev_outputs.getText();
@@ -179,14 +184,14 @@ public:
                 for (auto rate : currentDevice->getAvailableSampleRates())
                 {
                     auto intRate = roundToInt(rate);
-                    combo_dev_rates.addItem(String(intRate) + " Hz", intRate);
+                    combo_dev_rates.addItem(String(intRate) + L" Hz", intRate);
                 }
                 combo_dev_rates.setSelectedId(sample_rate, dontSendNotification);
             }
         };
         combo_dev_rates.onChange = [this]
         {
-            _opt->save("combo_dev_rate", combo_dev_rates.getSelectedId());
+            _opt->save(L"combo_dev_rate", combo_dev_rates.getSelectedId());
             combo_dev_outputs.onChange();
         };
     }
@@ -212,63 +217,65 @@ public:
         auto combo_with_label = [&](ComboBox& combo)
         {
             auto line = area.removeFromTop(theme::height);
-            line.removeFromLeft(theme::label);
+            line.removeFromLeft(theme::label_width);
             combo.setBounds(line);
             area.removeFromTop(theme::margin);
         };
-
-        // devices
-        combo_with_label(combo_dev_types);
-        combo_with_label(combo_dev_outputs);
-        combo_with_label(combo_dev_rates);
-
-        // filter
-        filter_component.setBounds(area.removeFromTop(theme::height));
-        area.removeFromTop(theme::margin * 2 + theme::height);
-
-        // === middle settings ============================================================
-        auto line = area.removeFromTop(theme::height);
-        line.removeFromLeft(theme::label);
-        combo_buff_size.setBounds(line);
-        area.removeFromTop(theme::margin);
-        line = area.removeFromTop(theme::height);
-        checkbox_tone.setBounds(line.removeFromLeft(theme::label - theme::margin));
-        line.removeFromLeft(theme::margin);
-        combo_tone.setBounds(line);
-        area.removeFromTop(theme::margin);
-
-        // from bottom
-        area.removeFromBottom(theme::margin);
-        calibrations_component.setBounds(area.removeFromBottom(280));
-
-        // === stat =======================================================================
-        area.removeFromBottom(theme::height + theme::margin);
-        button_stat_reset.setBounds(area.removeFromBottom(theme::height));
-        area.removeFromBottom(theme::margin);
-        button_zero_reset.setBounds(area.removeFromBottom(theme::height));
-        area.removeFromBottom(theme::margin);
-        button_zero.setBounds(area.removeFromBottom(theme::height));
-
-        auto remain = area;
-        area.removeFromLeft(theme::label);
-        auto right = area.removeFromRight(getWidth() / 2);
-        right.removeFromRight(theme::margin * 2);
-
-        for (auto line_index = LEFT; line_index < LEVEL_SIZE; line_index++)
+        // последовательное размещение компонентов сверху вниз
         {
-            labels_stat.at(line_index).at(labels_stat_column_t::VALUE) ->setBounds(area.removeFromTop (theme::height));
-            labels_stat.at(line_index).at(labels_stat_column_t::MINMAX)->setBounds(right.removeFromTop(theme::height));
-            remain.removeFromTop(theme::height);
+            // девайсы
+            combo_with_label(combo_dev_types);
+            combo_with_label(combo_dev_outputs);
+            combo_with_label(combo_dev_rates);
 
-            if (line_index < level_t::BALANCE) {
-                area .removeFromTop(theme::margin);
-                right.removeFromTop(theme::margin);
-                remain.removeFromTop(theme::margin);
-            }
+            // фильтр
+            filter_component.setBounds(area.removeFromTop(theme::height));
+            area.removeFromTop(theme::margin * 2 + theme::height);
+
+            // middle settings
+            auto line = area.removeFromTop(theme::height);
+            line.removeFromLeft(theme::label_width);
+            combo_buff_size.setBounds(line);
+            area.removeFromTop(theme::margin);
+            line = area.removeFromTop(theme::height);
+            checkbox_tone.setBounds(line.removeFromLeft(theme::label_width - theme::margin));
+            line.removeFromLeft(theme::margin);
+            combo_tone.setBounds(line);
+            area.removeFromTop(theme::margin);
         }
-        remain.removeFromTop(theme::margin);
-        remain.removeFromBottom(theme::margin);
-        history_plot = remain;
+        // снизу вверх
+        {
+            area.removeFromBottom(theme::margin);
+            calibrations_component.setBounds(area.removeFromBottom(220));
+
+            // stat
+            area.removeFromBottom(theme::margin * 2);
+            auto line = area.removeFromBottom(theme::height);
+            button_zero.setBounds(line.removeFromRight(theme::button_width));
+            line.removeFromRight(theme::margin);
+            button_stat_reset.setBounds(line.removeFromRight(theme::button_width));
+
+            auto remain = area;
+            area.removeFromLeft(theme::label_width);
+            auto right = area.removeFromRight(getWidth() / 2);
+            right.removeFromRight(theme::margin * 2);
+
+            for (auto line_index = LEFT; line_index < LEVEL_SIZE; line_index++)
+            {
+                labels_stat.at(line_index).at(labels_stat_column_t::VALUE) ->setBounds(area.removeFromTop (theme::height));
+                labels_stat.at(line_index).at(labels_stat_column_t::MINMAX)->setBounds(right.removeFromTop(theme::height));
+                remain.removeFromTop(theme::height);
+
+                if (line_index < level_t::BALANCE) {
+                    area .removeFromTop (theme::margin);
+                    right.removeFromTop (theme::margin);
+                    remain.removeFromTop(theme::margin);
+                }
+            }
+            remain.removeFromTop(theme::margin);
+            remain.removeFromBottom(theme::margin);
+            history_plot = remain;
+        }
     }
 
     void timerCallback() override
@@ -288,7 +295,7 @@ public:
         else {
             rms.at(LEFT)  = signal.gain2db(rms.at(LEFT))  - signal.zero_get(LEFT);
             rms.at(RIGHT) = signal.gain2db(rms.at(RIGHT)) - signal.zero_get(RIGHT);
-            print = [](double value) { return String(value, 3) + " dB"; };
+            print = [](double value) { return String(value, 3) + L" dB"; };
         }
         rms.push_back(abs(rms.at(LEFT) - rms.at(RIGHT)));
         signal.minmax_set(rms);
@@ -310,12 +317,11 @@ public:
             if (isfinite(minmax.at(MAX))) printed.at(2) = print(minmax.at(MAX));
 
             labels_stat.at(line).at(1)->setText(printed.at(0), dontSendNotification);
-            labels_stat.at(line).at(2)->setText(printed.at(1) + " .. " + printed.at(2), dontSendNotification);
+            labels_stat.at(line).at(2)->setText(printed.at(1) + L" .. " + printed.at(2), dontSendNotification);
             labels_stat.at(line).at(1)->setColour(Label::textColourId, isfinite(rms.at(line)) ? Colours::black : Colours::grey);
         }
 
-        if (button_zero.isEnabled()       == calibrate) button_zero.setEnabled      (!calibrate);
-        if (button_zero_reset.isEnabled() == calibrate) button_zero_reset.setEnabled(!calibrate);
+        if (button_zero.isEnabled() == calibrate) button_zero.setEnabled(!calibrate); // todo: логику без этого
     }
 
     void paint(Graphics& g) override {
@@ -327,7 +333,7 @@ public:
 
         float offset = 0;
         float value;
-        if (history_stat->get_first_value(LEFT, history_plot.getWidth(), value))
+        if (history_stat->get_first_value(LEFT, history_plot.getWidth(), value)) // todo: устранить мерцание при заполнении буфера
         {
             Path path;
             do {
@@ -355,13 +361,13 @@ private:
     filter_component_                      filter_component;
     Rectangle<int>                         history_plot;
 
-    Label        label_device_type  { {}, "Type"        },
-                 label_device       { {}, "Device"      },
-                 label_sample_rate  { {}, "Sample rate" },
-                 label_buff_size    { {}, "Buff size"   };
-    ToggleButton checkbox_tone      { "Tone"            };
+    Label        label_device_type  { {}, L"Type"        },
+                 label_device       { {}, L"Device"      },
+                 label_sample_rate  { {}, L"Sample rate" },
+                 label_buff_size    { {}, L"Buff size"   };
+    ToggleButton checkbox_tone      {     L"Tone"        };
 
-    TextButton                     button_zero, button_zero_reset, button_stat_reset;
+    TextButton                     button_zero, button_stat_reset;
     ComboBox                       combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
     theme::checkbox_right_text_lf_ theme_right_text;
 

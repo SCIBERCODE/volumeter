@@ -1,15 +1,16 @@
-#pragma once
+﻿#pragma once
 #include <JuceHeader.h>
 
 namespace theme
 {
-    const size_t height = 20;
-    const size_t margin = 5;
-    const size_t label  = 80;
-    const char*  empty  = "--";
+    const size_t height       = 20;
+    const size_t margin       = 5;
+    const size_t label_width  = 80;
+    const size_t button_width = 100;
+    const auto   empty        = L"--";
 
     auto grey_level(uint8_t level) {
-        return Colour::greyLevel(jmap((float)level, 0.0f, 256.0f, 0.0f, 1.0f));
+        return Colour::greyLevel(jmap(static_cast<float>(level), 0.0f, 256.0f, 0.0f, 1.0f));
     }
 
     class light_ : public LookAndFeel_V4 {
@@ -34,7 +35,7 @@ namespace theme
             int w, int h, int titleSpaceX, int titleSpaceW,
             const Image* icon, bool drawTitleTextOnLeft)
         {
-            LookAndFeel_V4::drawDocumentWindowTitleBar(window, g, w, (int)(h * 0.95), titleSpaceX, titleSpaceW, icon, drawTitleTextOnLeft);
+            LookAndFeel_V4::drawDocumentWindowTitleBar(window, g, w, static_cast<int>(h * 0.95), titleSpaceX, titleSpaceW, icon, drawTitleTextOnLeft);
         }
 
         Font getComboBoxFont(ComboBox &) {
@@ -123,10 +124,9 @@ namespace theme
                 g.setOpacity(0.5f);
 
             g.drawFittedText(button.getButtonText(),
-                button.getLocalBounds().withTrimmedRight(6 + (int)tickWidth),
+                button.getLocalBounds().withTrimmedRight(6 + static_cast<int>(tickWidth)),
                 Justification::centredRight, 10);
 
-            //font.getStringWidth(button.getButtonText())
             drawTickBox(g, button, button.getWidth() - tickWidth, (button.getHeight() - tickWidth) * 0.5f,
                 tickWidth, tickWidth,
                 button.getToggleState(),

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <JuceHeader.h>
 #include <spuce/filters/iir.h>
 #include <spuce/filters/butterworth_iir.h>
@@ -143,8 +143,8 @@ class signal_
 public:
 
     signal_() :
-        sample_rate(_opt->get_int("sample_rate")),
-        order      (_opt->get_int("order"))
+        sample_rate(_opt->get_int(L"sample_rate")),
+        order      (_opt->get_int(L"order"))
     {
         zero.fill(0.0);
         minmax_clear();
@@ -165,7 +165,7 @@ public:
     }
 
     auto minmax_set(const vector<double>& rms) {
-        for (auto line = LEFT; line < LEVEL_SIZE; line++) // bug: íà âîëüòàõ ïðè ïåðåêëþ÷åíèè íèæíÿÿ ãðàíèöà íå ïîõîæà íà ïðàâäó
+        for (auto line = LEFT; line < LEVEL_SIZE; line++) // bug: Ð½Ð° Ð²Ð¾Ð»ÑŒÑ‚Ð°Ñ… Ð¿Ñ€Ð¸ Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ð¸ Ð½Ð¸Ð¶Ð½ÑÑ Ð³Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð½Ðµ Ð¿Ð¾Ñ…Ð¾Ð¶Ð° Ð½Ð° Ð¿Ñ€Ð°Ð²Ð´Ñƒ
             if (isfinite(rms.at(line)))
             {
                 if (!isfinite(minmax.at(line).at(MIN))) minmax.at(line).at(MIN) = rms.at(line);
@@ -219,16 +219,16 @@ public:
         lock_guard<mutex> locker(audio_process);
         for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
-            if (_opt->get_int("pass_high"))
+            if (_opt->get_int(L"pass_high"))
             {
                 iir_coeff high_pass(order, filter_type::high);
                 butterworth_iir(high_pass, 20.0 / sample_rate, 3.0);
                 filter.at(channel).at(HIGH_PASS) = make_unique<iir<float_type, float_type>>(high_pass);
             }
-            if (_opt->get_int("pass_low"))
+            if (_opt->get_int(L"pass_low"))
             {
                 iir_coeff low_pass(order, filter_type::low);
-                butterworth_iir(low_pass, _opt->get_int("pass_low_value") / sample_rate, 3.0);
+                butterworth_iir(low_pass, _opt->get_int(L"pass_low_value") / sample_rate, 3.0);
                 filter.at(channel).at(LOW_PASS) = make_unique<iir<float_type, float_type>>(low_pass);
             }
         }
@@ -239,7 +239,7 @@ public:
         sample_rate = sample_rate_;
 
         osc.set_sample_rate(sample_rate);
-        osc.set_freq(static_cast<float>(_opt->get_int("tone_value")));
+        osc.set_freq(static_cast<float>(_opt->get_int(L"tone_value")));
         osc.reset();
 
         filter_init();
@@ -247,15 +247,15 @@ public:
 
     void next_audio_block(const AudioSourceChannelInfo& buffer)
     {
-        if (audio_process.try_lock()) // todo: áèòûé áóôåð íå íîðì, ñèãíàëèçèðîâàòü, ÷òî íå òÿíåò ïðîö òåêóùèõ íàñòðîåê
+        if (audio_process.try_lock()) // todo: Ð±Ð¸Ñ‚Ñ‹Ð¹ Ð±ÑƒÑ„ÐµÑ€ Ð½Ðµ Ð½Ð¾Ñ€Ð¼, ÑÐ¸Ð³Ð½Ð°Ð»Ð¸Ð·Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ, Ñ‡Ñ‚Ð¾ Ð½Ðµ Ñ‚ÑÐ½ÐµÑ‚ Ð¿Ñ€Ð¾Ñ† Ñ‚ÐµÐºÑƒÑ‰Ð¸Ñ… Ð½Ð°ÑÑ‚Ñ€Ð¾ÐµÐº
         {
             if (buff)
             {
                 auto read          = buffer.buffer->getArrayOfReadPointers();
                 auto write         = buffer.buffer->getArrayOfWritePointers();
-                auto use_high_pass = _opt->get_int("pass_high") && filter.at(LEFT).at(HIGH_PASS) && filter.at(RIGHT).at(HIGH_PASS);
-                auto use_low_pass  = _opt->get_int("pass_low")  && filter.at(LEFT).at(LOW_PASS)  && filter.at(RIGHT).at(LOW_PASS);
-                auto use_tone      = _opt->get_int("tone");
+                auto use_high_pass = _opt->get_int(L"pass_high") && filter.at(LEFT).at(HIGH_PASS) && filter.at(RIGHT).at(HIGH_PASS);
+                auto use_low_pass  = _opt->get_int(L"pass_low")  && filter.at(LEFT).at(LOW_PASS)  && filter.at(RIGHT).at(LOW_PASS);
+                auto use_tone      = _opt->get_int(L"tone");
 
                 for (auto channel = LEFT; channel <= RIGHT; channel++)
                     for (auto sample_index = 0; sample_index < buffer.numSamples; ++sample_index)

@@ -1,18 +1,18 @@
-#pragma once
+﻿#pragma once
 #include <JuceHeader.h>
 #include <memory>
 #include "theme.h"
 #include "settings.h"
 
 const map<int, String> _prefs = {
-    { -15,  "f" },
-    { -12,  "p" },
-    {  -9,  "n" },
+    { -15, L"f" },
+    { -12, L"p" },
+    {  -9, L"n" },
     {  -6, L"μ" },
-    {  -3,  "m" },
-    {   0,  ""  },
-    {   3,  "k" },
-    {   6,  "M" }
+    {  -3, L"m" },
+    {   0, L""  },
+    {   3, L"k" },
+    {   6, L"M" }
 };
 
 enum level_t : size_t {

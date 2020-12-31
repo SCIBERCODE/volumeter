@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 class settings_ {
 protected:
@@ -8,29 +8,31 @@ protected:
     };
 
     const map<String, option> options = {
-        { "combo_dev_type",     { "device_type",        "ASIO"  } },
-        { "combo_dev_output",   { "device",             ""      } },
-        { "combo_dev_rate",     { "sample_rate",        "44100" } },
-        { "checkbox_high_pass", { "pass_high",          "0"     } },
-        { "checkbox_low_pass",  { "pass_low",           "0"     } },
-        { "slider_freq_high",   { "pass_low_value",     "15000" } },
-        { "combo_order",        { "order",              "120"   } },
-        { "combo_buff_size",    { "buff_size",          "500"   } },
-        { "checkbox_tone",      { "tone",               "0"     } },
-        { "combo_tone",         { "tone_value",         "1000"  } },
+        { L"combo_dev_type",     { L"device_type",        L"ASIO"  } },
+        { L"combo_dev_output",   { L"device",             L""      } },
+        { L"combo_dev_rate",     { L"sample_rate",        L"44100" } },
+        { L"checkbox_high_pass", { L"pass_high",          L"0"     } },
+        { L"checkbox_low_pass",  { L"pass_low",           L"0"     } },
+        { L"slider_freq_high",   { L"pass_low_value",     L"15000" } },
+        { L"combo_order",        { L"order",              L"120"   } },
+        { L"combo_buff_size",    { L"buff_size",          L"500"   } },
+        { L"checkbox_tone",      { L"tone",               L"0"     } },
+        { L"combo_tone",         { L"tone_value",         L"1000"  } },
         // calibrations component
-        { "checkbox_cal",       { "calibrate",          "0"     } },
-        { "combo_prefix",       { "prefix",             "0"     } },
-        { "table_cals",         { "calibrations",       ""      } },
-        { "table_cals_row",     { "calibrations_index", "-1"    } }
+        { L"checkbox_cal",       { L"calibrate",          L"0"     } },
+        { L"combo_prefix",       { L"prefix",             L"0"     } },
+        { L"table_cals",         { L"calibrations",       L""      } },
+        { L"table_cals_row",     { L"calibrations_index", L"-1"    } },
+
+        { L"checkbox_filter",    { L"filter",             L"0"     } }
     };
 
 public:
     settings_()
     {
         PropertiesFile::Options params;
-        params.applicationName = "volumeter";
-        params.filenameSuffix  = ".xml";
+        params.applicationName = L"volumeter";
+        params.filenameSuffix  = L".xml";
         params.folderName      = File::getCurrentWorkingDirectory().getFullPathName();
         params.storageFormat   = PropertiesFile::storeAsXML;
         settings.setStorageParameters(params);
@@ -67,8 +69,8 @@ public:
     }
 
 private:
-    // èùåì ïî èìåíè êîíòðîëà, ïîòîìó êàê ïðåèìóùåñòâåííî íàñòðîéêè çàïðàøèâàåò ãóé
-    // ïîñëå ãëÿäèì â èìåíàõ îïöèé íåïîñðåäñòâåííî èñïîëüçóþùèõñÿ â ôàéëå êîíôèãà
+    // Ð¸Ñ‰ÐµÐ¼ Ð¿Ð¾ Ð¸Ð¼ÐµÐ½Ð¸ ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»Ð°, Ð¿Ð¾Ñ‚Ð¾Ð¼Ñƒ ÐºÐ°Ðº Ð¿Ñ€ÐµÐ¸Ð¼ÑƒÑ‰ÐµÑÑ‚Ð²ÐµÐ½Ð½Ð¾ Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸ Ð·Ð°Ð¿Ñ€Ð°ÑˆÐ¸Ð²Ð°ÐµÑ‚ Ð³ÑƒÐ¹
+    // Ð¿Ð¾ÑÐ»Ðµ Ð³Ð»ÑÐ´Ð¸Ð¼ Ð² Ð¸Ð¼ÐµÐ½Ð°Ñ… Ð¾Ð¿Ñ†Ð¸Ð¹ Ð½ÐµÐ¿Ð¾ÑÑ€ÐµÐ´ÑÑ‚Ð²ÐµÐ½Ð½Ð¾ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÑŽÑ‰Ð¸Ñ…ÑÑ Ð² Ñ„Ð°Ð¹Ð»Ðµ ÐºÐ¾Ð½Ñ„Ð¸Ð³Ð°
     String get_key(const String& request) {
         if (options.count(request) > 0)
             return request;
