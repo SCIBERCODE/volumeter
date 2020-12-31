@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include <JuceHeader.h>
 #include "gui_filter.h"
-#include "gui_cals.h"
+#include "gui_calibration.h"
 
 extern unique_ptr<settings_> _opt;
 

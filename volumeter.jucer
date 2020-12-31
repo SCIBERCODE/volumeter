@@ -12,7 +12,8 @@
     </GROUP>
     <GROUP id="{4D1FF0D6-F97F-78FF-33FC-9D81D7CAB011}" name="source">
       <FILE id="FYAWgD" name="gui.h" compile="0" resource="0" file="Source/gui.h"/>
-      <FILE id="qEaw0o" name="gui_cals.h" compile="0" resource="0" file="Source/gui_cals.h"/>
+      <FILE id="qEaw0o" name="gui_calibration.h" compile="0" resource="0"
+            file="Source/gui_calibration.h"/>
       <FILE id="dZq3WU" name="gui_filter.h" compile="0" resource="0" file="Source/gui_filter.h"/>
       <FILE id="FOprC1" name="main.cpp" compile="1" resource="0" file="Source/main.cpp"/>
       <FILE id="GuKL11" name="main.h" compile="0" resource="0" file="Source/main.h"/>
@@ -26,9 +27,9 @@
     <VS2017 targetFolder="Builds/VisualStudio2017">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="volumeter" winArchitecture="Win32"
-                       generateManifest="0"/>
+                       generateManifest="0" characterSet="Unicode"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="volumeter" winArchitecture="Win32"
-                       generateManifest="0"/>
+                       generateManifest="0" characterSet="Unicode"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../audio/juce/modules"/>
