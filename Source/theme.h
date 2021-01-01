@@ -147,14 +147,17 @@ namespace theme
             auto fontSize = jmin(font_height, button.getHeight() * 0.75f);
             auto tickWidth = fontSize * 1.1f;
 
-            drawTickBox(g, button, 4.0f, (button.getHeight() - tickWidth) * 0.5f,
-                tickWidth, tickWidth,
-                button.getToggleState(),
-                button.isEnabled(),
-                shouldDrawButtonAsHighlighted,
-                shouldDrawButtonAsDown);
+            if (button.getName() != L"b")
+                drawTickBox(g, button, 4.0f, (button.getHeight() - tickWidth) * 0.5f,
+                    tickWidth, tickWidth,
+                    button.getToggleState(),
+                    button.isEnabled(),
+                    shouldDrawButtonAsHighlighted,
+                    shouldDrawButtonAsDown);
+            else
+                tickWidth = 0.0f;
 
-            g.setColour(button.findColour(ToggleButton::textColourId));
+            g.setColour(button.getName() != L"rm" ? button.findColour(ToggleButton::textColourId) : Colours::green);
             Font font(14.0f);
             g.setFont(button.getToggleState() ? font.boldened() : font);
 

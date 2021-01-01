@@ -76,7 +76,7 @@ public:
 
     void clear()
     {
-        if (buffer.at(LEFT))  fill_n(buffer.at(LEFT).get(),  max_size, numeric_limits<float>::quiet_NaN());
+        if (buffer.at(LEFT )) fill_n(buffer.at(LEFT ).get(), max_size, numeric_limits<float>::quiet_NaN());
         if (buffer.at(RIGHT)) fill_n(buffer.at(RIGHT).get(), max_size, numeric_limits<float>::quiet_NaN());
         tail.fill(0);
     }
@@ -133,6 +133,22 @@ public:
 
         return isfinite(value);
     }
+
+    auto get_minmax(level_t channel, size_t size) {
+        array<float, STAT_SIZE> minmax = { 0.0f, 0.0f };
+        float value;
+
+        if (get_first_value(channel, size, value)) {
+            minmax.at(MAX) = value + 0.00001f;
+            do {
+                if (!isfinite(value)) break;
+                minmax.at(MIN) = min(value, minmax.at(MIN));
+                minmax.at(MAX) = max(value, minmax.at(MAX));
+            }
+            while (get_next_value(value));
+        }
+       return minmax;
+    }
 };
 
 
@@ -152,10 +168,21 @@ public:
         minmax_clear();
     }
 
-    void zero_set() {
+    void zero_set(
+        double value_left  = numeric_limits<float>::quiet_NaN(),
+        double value_right = numeric_limits<float>::quiet_NaN())
+    {
         lock_guard<mutex> locker(audio_process);
-        zero.at(LEFT)  = gain2db(buff->get_rms(LEFT));
-        zero.at(RIGHT) = gain2db(buff->get_rms(RIGHT));
+        if (isfinite(value_left) && isfinite(value_right)) {
+            zero.at(LEFT)  = value_left;
+            zero.at(RIGHT) = value_right;
+        }
+        else {
+            zero.at(LEFT)  = gain2db(buff->get_rms(LEFT));
+            zero.at(RIGHT) = gain2db(buff->get_rms(RIGHT));
+            _opt->save(L"zero_value_left",  zero.at(LEFT));
+            _opt->save(L"zero_value_right", zero.at(RIGHT));
+        }
         minmax_clear();
     }
     auto zero_get(level_t channel) {

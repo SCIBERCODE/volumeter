@@ -19,8 +19,6 @@ public:
     filter_component_(signal_& signal) : signal(signal)
     // todo: filter_component_(shared_ptr<signal_> signal) : signal(move(signal))
     {
-        //addAndMakeVisible(slider_freq); // todo: добавить какую-нибудь графику
-
         addAndMakeVisible(group);
         addAndMakeVisible(label_filter);
         label_filter.setColour(Label::backgroundColourId, _theme->get_bg_color());
@@ -79,7 +77,7 @@ public:
             if (check_input(button, value))
                 edit->setText(value, true);
 
-            // выпадайка с порядком фильтра
+            // порядок фильтра
             for (auto const item : order_list)
                 combo->addItem(String(item), item);
 

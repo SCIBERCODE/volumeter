@@ -15,6 +15,9 @@ protected:
         { L"checkbox_tone",      { L"tone",               L"0"     } },
         { L"combo_tone",         { L"tone_value",         L"1000"  } },
         { L"button_pause_graph", { L"graph_paused",       L"0"     } },
+        { L"button_zero",        { L"zero",               L"0"     } },
+        { { },                   { L"zero_value_left",    L"0"     } },
+        { { },                   { L"zero_value_right",   L"0"     } },
         // калибровка
         { L"checkbox_cal",       { L"calibrate",          L"0"     } },
         { L"combo_prefix",       { L"prefix",             L"0"     } },

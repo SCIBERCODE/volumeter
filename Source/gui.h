@@ -65,18 +65,29 @@ public:
         };
 
         // === stat =======================================================================
-        const array<String, 3> stat_captions = { L"Left", L"Right", L"Balance" }; // todo: хорошо бы по точке центровать цифры
-        for (auto line = LEFT; line < LEVEL_SIZE; line++) {
+        const array<String, 3> stat_captions = { L"Left", L"Right", L"Balance" }; // todo: центровать цифры по точке
+        for (auto line = LEFT; line < LEVEL_SIZE; line++) { // todo: заменить таблицей
             for (auto column = LABEL; column < LABELS_STAT_COLUMN_SIZE; column++)
             {
-                auto label = make_unique<Label>(String(), column == LABEL ? stat_captions.at(line) : String());
-                addAndMakeVisible(label.get());
-                labels_stat.at(line).at(column) = move(label);
+                if (column == LABEL)
+                {
+                    auto checkbox = make_unique<ToggleButton>();
+                    checkbox->setButtonText(stat_captions.at(line));
+                    addAndMakeVisible(checkbox.get());
+                    checkbox->setLookAndFeel(&theme_right_text);
+                    if (line == BALANCE) checkbox->setName(L"b");
+                    if (line == RIGHT) checkbox->setName(L"r");
+                    check_stat.at(line) = move(checkbox);
+                }
+                else {
+                    auto label = make_unique<Label>();
+                    addAndMakeVisible(label.get());
+                    label_stat.at(line).at(column-1) = move(label);
+                }
             }
-            auto label_value = labels_stat.at(line).at(VALUE).get();
-            labels_stat.at(line).at(LABEL) ->attachToComponent(label_value, true);
-            labels_stat.at(line).at(VALUE) ->setFont(label_value->getFont().boldened());
-            labels_stat.at(line).at(MINMAX)->setJustificationType(Justification::right);
+            auto label_value = label_stat.at(line).at(VALUE-1).get();
+            label_stat.at(line).at(VALUE-1) ->setFont(label_value->getFont().boldened());
+            label_stat.at(line).at(MINMAX-1)->setJustificationType(Justification::right);
         }
 
         addAndMakeVisible(button_zero);
@@ -92,11 +103,21 @@ public:
 
         button_zero.onClick = [this]
         {
-            if (button_zero.getToggleState())
+            auto value = button_zero.getToggleState();
+            _opt->save(L"button_zero", value);
+            if (value)
                 signal.zero_set();
             else
                 signal.zero_clear();
         };
+        if (_opt->get_int(L"button_zero")) {
+            button_zero.setToggleState(true, dontSendNotification);
+            signal.zero_set(
+                _opt->get_text(L"zero_value_left" ).getDoubleValue(),
+                _opt->get_text(L"zero_value_right").getDoubleValue()
+            );
+        }
+
         button_pause_graph.setToggleState(_opt->get_int(L"button_pause_graph"), dontSendNotification);
         button_pause_graph.onClick = [this]
         {
@@ -268,19 +289,21 @@ public:
             button_stat_reset.setBounds(line.removeFromRight(theme::button_width));
 
             auto remain = area;
-            area.removeFromLeft(theme::label_width);
-            auto right = area.removeFromRight(getWidth() / 2);
+            auto left   = area.removeFromLeft(theme::label_width);
+            auto right  = area.removeFromRight(getWidth() / 2);
             right.removeFromRight(theme::margin * 2);
 
             for (auto line_index = LEFT; line_index < LEVEL_SIZE; line_index++)
             {
-                labels_stat.at(line_index).at(labels_stat_column_t::VALUE) ->setBounds(area.removeFromTop (theme::height));
-                labels_stat.at(line_index).at(labels_stat_column_t::MINMAX)->setBounds(right.removeFromTop(theme::height));
+                check_stat.at(line_index)->setBounds(left.removeFromTop(theme::height));
+                label_stat.at(line_index).at(labels_stat_column_t::VALUE-1) ->setBounds(area.removeFromTop (theme::height));
+                label_stat.at(line_index).at(labels_stat_column_t::MINMAX-1)->setBounds(right.removeFromTop(theme::height));
                 remain.removeFromTop(theme::height);
 
                 if (line_index < level_t::BALANCE) {
                     area .removeFromTop (theme::margin);
                     right.removeFromTop (theme::margin);
+                    left .removeFromTop (theme::margin);
                     remain.removeFromTop(theme::margin);
                 }
             }
@@ -316,7 +339,7 @@ public:
             if (isfinite(rms.at(LEFT))) { // todo: syncrochannels
                 history_stat->enqueue(LEFT,  static_cast<float>(rms.at(LEFT)));
                 history_stat->enqueue(RIGHT, static_cast<float>(rms.at(RIGHT)));
-                repaint(); //#
+                repaint(); // todo: оптимизировать
             }
         }
 
@@ -330,9 +353,9 @@ public:
             if (isfinite(minmax.at(MIN))) printed.at(1) = print(minmax.at(MIN));
             if (isfinite(minmax.at(MAX))) printed.at(2) = print(minmax.at(MAX));
 
-            labels_stat.at(line).at(1)->setText(printed.at(0), dontSendNotification);
-            labels_stat.at(line).at(2)->setText(printed.at(1) + L" .. " + printed.at(2), dontSendNotification);
-            labels_stat.at(line).at(1)->setColour(Label::textColourId, isfinite(rms.at(line)) ? Colours::black : Colours::grey);
+            label_stat.at(line).at(0)->setText(printed.at(0), dontSendNotification);
+            label_stat.at(line).at(1)->setText(printed.at(1) + L" .. " + printed.at(2), dontSendNotification);
+            label_stat.at(line).at(0)->setColour(Label::textColourId, isfinite(rms.at(line)) ? Colours::black : Colours::grey);
         }
 
         if (button_zero.isEnabled() == calibrate) button_zero.setEnabled(!calibrate); // todo: логику без этого
@@ -341,39 +364,64 @@ public:
     void paint(Graphics& g) override {
         g.setColour(Colours::white);
         g.fillRect(history_plot);
+
+        for (auto channel = LEFT; channel <= RIGHT; channel++)
+        {
+            auto  minmax = history_stat->get_minmax(channel, history_plot.getWidth());
+            float offset = 0.0f;
+            float value;
+            if (history_stat->get_first_value(channel, history_plot.getWidth(), value)) // bug: устранить мерцание при заполнении буфера
+            {
+                Path path;
+                do {
+                    if (!isfinite(value)) break;
+                    auto x = history_plot.getRight() - offset++;
+                    auto y = -value * (history_plot.getHeight() / abs(minmax.at(MIN) - minmax.at(MAX)));
+                    if (path.isEmpty())
+                        path.startNewSubPath(x, y);
+
+                    path.lineTo(x, y);
+                } while (history_stat->get_next_value(value));
+                if (offset < 2) return;
+                path.scaleToFit(history_plot.getX() + (history_plot.getWidth() - offset), history_plot.getY() + 15.0f, offset, history_plot.getHeight() - 30.0f, false);
+                /*auto x = history_plot.getX() + (history_plot.getWidth() - offset);
+                auto y = history_plot.getY() + 15;
+                auto w = offset;
+                auto h = history_plot.getHeight() - 30;
+                auto bounds = path.getBounds();
+                auto trans = AffineTransform::translation(-bounds.getX(), -bounds.getY());
+                auto w2 = w / bounds.getWidth();
+                auto h2 = h / bounds.getHeight();
+                trans.scale(w2, h2);
+                auto trans2 = trans.translated(x, y);
+                path.applyTransform(trans2);*/
+
+                g.setColour(channel == LEFT ? Colours::black : Colours::green);
+                g.strokePath(path, PathStrokeType(1.0f));
+
+                PathStrokeType path_stroke(1.0f);
+
+                //    const float dotted_pattern[2] = { 5.0f, 5.0f };
+                  //  path_stroke.createDashedStroke(path, path, dotted_pattern, _countof(dotted_pattern));
+
+            }
+        }
         g.setColour(Colours::grey);
         g.drawRect(history_plot);
-        g.setColour(Colours::black);
-
-        float offset = 0;
-        float value;
-        if (history_stat->get_first_value(LEFT, history_plot.getWidth(), value)) // bug: устранить мерцание при заполнении буфера
-        {
-            Path path;
-            do {
-                if (!isfinite(value)) break;
-                auto x = history_plot.getRight() - offset++;
-                auto y = abs(value * (history_plot.getHeight() / 130.0f)) + history_plot.getY();
-                if (path.isEmpty())
-                    path.startNewSubPath(x, y);
-
-                path.lineTo(x, y);
-            }
-            while (history_stat->get_next_value(value));
-            g.strokePath(path, PathStrokeType(1.0f));
-        }
     }
 
 //=========================================================================================
 private:
 //=========================================================================================
 
-    array<array<unique_ptr<Label>, 3>, 3>  labels_stat;  // [LEFT>RIGHT>BALANCE][MIN>MAX]
-    unique_ptr<circle_>                    history_stat; // [LEFT>RIGHT        ]
-    signal_                                signal;
-    calibrations_component_                calibrations_component;
-    filter_component_                      filter_component;
-    Rectangle<int>                         history_plot;
+    //array<array<unique_ptr<Label>,
+    array<unique_ptr<ToggleButton>, LEVEL_SIZE>    check_stat;  // [LEFT>RIGHT>BALANCE][LABEL>VALUE>MINMAX]
+    array<array<unique_ptr<Label>, 2>, LEVEL_SIZE> label_stat;  // [LEFT>RIGHT>BALANCE][LABEL>VALUE>MINMAX]
+    unique_ptr<circle_>                       history_stat;
+    signal_                                   signal;
+    calibrations_component_                   calibrations_component;
+    filter_component_                         filter_component;
+    Rectangle<int>                            history_plot;
 
     Label        label_device_type  { {}, L"Type"        },
                  label_device       { {}, L"Device"      },

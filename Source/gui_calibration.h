@@ -45,7 +45,7 @@ public:
 
         label_cal_add.attachToComponent(&editor_cal_name, true);
         label_cal_channels.attachToComponent(&editor_cal_channels.at(LEFT), true);
-        editor_cal_name.setTextToShowWhenEmpty(L"Calibration Name (optional)", Colours::grey);
+        editor_cal_name.setTextToShowWhenEmpty(L"Calibration name (optional)", Colours::grey);
         editor_cal_channels.at(LEFT) .setTextToShowWhenEmpty(L"0.0", Colours::grey); // todo: change hint according to selected pref
         editor_cal_channels.at(RIGHT).setTextToShowWhenEmpty(L"0.0", Colours::grey);
         editor_cal_channels.at(LEFT) .setInputRestrictions(0, L"0123456789.");
