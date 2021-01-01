@@ -5,14 +5,17 @@ using namespace std;
 #include "main.h"
 #include "gui.h"
 
-unique_ptr<settings_> _opt;
+unique_ptr<settings_>     _opt;
+unique_ptr<theme::light_> _theme;
 
 application_::application_() {
-    _opt = make_unique<settings_>();
+    _opt   = make_unique<settings_>();
+    _theme = make_unique<theme::light_>();
 }
 
 application_::~application_() {
-    _opt.reset();
+    _opt  .reset();
+    _theme.reset();
 }
 
 const String application_::getApplicationName()    { return L"rms_volumeter"; }
@@ -22,7 +25,7 @@ bool application_::moreThanOneInstanceAllowed()    { return true;             }
 
 void application_::initialise(const String&)
 {
-    Desktop::getInstance().setDefaultLookAndFeel(&theme);
+    Desktop::getInstance().setDefaultLookAndFeel(_theme.get());
     main_window = make_unique<main_window_>(L"rms volumeter", new main_component_(), *this);
 }
 

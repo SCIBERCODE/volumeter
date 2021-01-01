@@ -8,89 +8,111 @@ class filter_component_ : public Component
 {
 protected:
     const vector<int> order_list = { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
+    const array<pair<const wchar_t *, const wchar_t *>, FILTER_TYPE_SIZE> type_text =
+    {
+        make_pair(L"High pass", L"pass_high"),
+        make_pair(L"Low pass" , L"pass_low" )
+    };
 
 public:
 
     filter_component_(signal_& signal) : signal(signal)
     // todo: filter_component_(shared_ptr<signal_> signal) : signal(move(signal))
     {
-        addAndMakeVisible(checkbox_filter);
-        checkbox_filter.setToggleState(_opt->get_int(L"checkbox_filter"), dontSendNotification);
-        checkbox_filter.onClick = [this]
+        //addAndMakeVisible(slider_freq); // todo: добавить какую-нибудь графику
+
+        addAndMakeVisible(group);
+        addAndMakeVisible(label_filter);
+        label_filter.setColour(Label::backgroundColourId, _theme->get_bg_color());
+
+        for (auto type = HIGH_PASS; type < FILTER_TYPE_SIZE; type++)
         {
-            _opt->save(L"checkbox_filter", checkbox_filter.getToggleState());
-        };
+            checkbox_type.at(type) = make_unique<ToggleButton>(type_text.at(type).first);
+            label_desc   .at(type) = make_unique<Label>();
+            edit_freq    .at(type) = make_unique<TextEditor>();
+            combo_order  .at(type) = make_unique<ComboBox>();
 
-        addAndMakeVisible(checkbox_high_pass);
-        addAndMakeVisible(checkbox_low_pass);
-        addAndMakeVisible(slider_freq_high);
-        addAndMakeVisible(combo_order);
+            auto button = checkbox_type.at(type).get();
+            auto label  = label_desc   .at(type).get();
+            auto edit   = edit_freq    .at(type).get();
+            auto combo  = combo_order  .at(type).get();
 
-        checkbox_high_pass.setToggleState(_opt->get_int(L"checkbox_high_pass"), dontSendNotification);
-        checkbox_low_pass .setToggleState(_opt->get_int(L"checkbox_low_pass"),  dontSendNotification);
-        checkbox_high_pass.setLookAndFeel(&theme_right);
+            auto option = String(type_text.at(type).second);
 
-        checkbox_high_pass.onClick = [&] {
-            _opt->save(L"checkbox_high_pass", checkbox_high_pass.getToggleState());
-            signal.filter_init();
-        };
-        checkbox_low_pass.onClick = [&] {
-            _opt->save(L"checkbox_low_pass", checkbox_low_pass.getToggleState());
-            signal.filter_init();
-        };
+            addAndMakeVisible(button);
+            addAndMakeVisible(label);
+            addAndMakeVisible(edit);
+            addAndMakeVisible(combo);
 
-        slider_freq_high.setSliderStyle(Slider::LinearHorizontal);
-        slider_freq_high.setTextBoxStyle(Slider::TextBoxRight, false, 60, 20);
-        slider_freq_high.setRange(20, 20000, 1);
-        slider_freq_high.setValue(_opt->get_int(L"slider_freq_high"), dontSendNotification);
-        slider_freq_high.onDragEnd = [&] {
-            _opt->save(L"slider_freq_high", slider_freq_high.getValue());
-            signal.filter_init();
-        };
+            // галка включения фильтра
+            button->setToggleState(_opt->get_int(option), dontSendNotification);
+            button->setLookAndFeel(&theme_right);
+            button->onClick = [&, type, option]
+            {
+                _opt->save(option, checkbox_type.at(type)->getToggleState());
+                signal.filter_init(type);
+            };
+            // поле для ввода частоты
+            label->setText("Freq/Order", dontSendNotification);
+            label->setJustificationType(Justification::centredRight);
+            edit->setText(_opt->get_text(option + L"_freq"), false);
+            edit->onTextChange = [&, type, option]
+            {
+                auto value = edit_freq.at(type)->getText();
+                _opt->save(option + L"_freq", value);
+            };
 
-        for (auto const item : order_list)
-            combo_order.addItem(String(item), item);
+            // выпадайка с порядком фильтра
+            for (auto const item : order_list)
+                combo->addItem(String(item), item);
 
-        combo_order.setSelectedId(_opt->get_int(L"combo_order"), dontSendNotification);
-        combo_order.setTooltip(L"Filter Order");
-        combo_order.onChange = [&]
-        {
-            auto value = combo_order.getSelectedId();
-            _opt->save(L"combo_order", value);
-            signal.set_order(value);
-            signal.filter_init();
-        };
+            combo->setSelectedId(_opt->get_int(option + L"_order"), dontSendNotification);
+            combo->onChange = [&, type, option]
+            {
+                auto value = combo_order.at(type)->getSelectedId();
+                _opt->save(option + L"_order", value);
+                signal.set_order(type, value);
+                signal.filter_init(type);
+            };
+        }
     }
 
-    ~filter_component_() {
-        checkbox_high_pass.setLookAndFeel(nullptr);
-    }
+    ~filter_component_() { }
 
     void resized() override
     {
-        auto area = getLocalBounds();
-        checkbox_high_pass.setBounds(area.removeFromLeft(theme::label_width + theme::margin * 3)); // todo: wtf with margins
-        slider_freq_high.setBounds(area.removeFromLeft(area.getWidth() - (60 + theme::label_width) - theme::margin * 6));
-        area.removeFromLeft(theme::margin);
-        combo_order.setBounds(area.removeFromLeft(60 + theme::margin));
-        area.removeFromLeft(theme::margin);
-        checkbox_low_pass.setBounds(area);
-        area.removeFromTop(theme::margin * 2 + theme::height);
+        auto area = getLocalBounds().reduced(theme::margin);
+        area.removeFromTop(theme::height + theme::margin);
+        for (auto type = HIGH_PASS; type < FILTER_TYPE_SIZE; type++)
+        {
+            auto line = area.removeFromTop(theme::height);
+            line.removeFromRight(theme::margin);
+            combo_order.at(type)->setBounds(line.removeFromRight(theme::button_width));
+            line.removeFromRight(theme::margin);
+            edit_freq.at(type)->setBounds(line.removeFromRight(theme::button_width));
+            line.removeFromRight(theme::margin);
+            label_desc.at(type)->setBounds(line.removeFromRight(theme::label_width));
+            line.removeFromRight(theme::margin);
+            checkbox_type.at(type)->setBounds(line);
+            area.removeFromTop(theme::margin);
+        }
+        group.setBounds(getLocalBounds());
+        _theme->set_header_label_bounds(label_filter);
     }
 
     void prepare_to_play(double sample_rate)
     {
-        slider_freq_high.setRange(20, sample_rate / 2, 1);
-        slider_freq_high.repaint();
+        // todo: проверять и при необходимости корректировать частоты
     }
 
 private:
     signal_                 & signal;
     theme::checkbox_right_lf_ theme_right;
-    ComboBox                  combo_order;
-    Slider                    slider_freq_high;
-    ToggleButton              checkbox_high_pass { L"High pass"  },
-                              checkbox_low_pass  { L"Low pass"   },
-                              checkbox_filter    { L"Use filter" };
+    Label                     label_filter { { }, L"Filter(s)" };
+    GroupComponent            group;
 
+    array<unique_ptr<ToggleButton>, FILTER_TYPE_SIZE> checkbox_type;
+    array<unique_ptr<Label>,        FILTER_TYPE_SIZE> label_desc;
+    array<unique_ptr<TextEditor>,   FILTER_TYPE_SIZE> edit_freq;
+    array<unique_ptr<ComboBox>,     FILTER_TYPE_SIZE> combo_order;
 };

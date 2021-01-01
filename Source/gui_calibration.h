@@ -1,8 +1,9 @@
-#pragma once
+﻿#pragma once
 #include <JuceHeader.h>
 #include "signal.h"
 
-extern unique_ptr<settings_> _opt;
+extern unique_ptr<settings_>     _opt;
+extern unique_ptr<theme::light_> _theme;
 
 class calibrations_component_ : public Component,
                                 public TableListBoxModel
@@ -11,6 +12,7 @@ public:
 
     calibrations_component_(signal_& _signal) : signal(_signal)
     {
+        addAndMakeVisible(group);
         addAndMakeVisible(checkbox_cal);
         checkbox_cal.setToggleState(_opt->get_int(L"checkbox_cal"), dontSendNotification);
         checkbox_cal.onClick = [this]
@@ -127,7 +129,7 @@ public:
         table_cals.deselectAllRows();
     }
 
-    void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на заголовке
+    void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на всём компоненте
         auto current = table_cals.getSelectedRow();
         selected = current == selected ? -1 : current;
         _opt->save(L"table_cals_row", selected);
@@ -173,27 +175,36 @@ public:
     }
 
     void resized() override {
-        auto area = getLocalBounds();
-        area.removeFromBottom(theme::margin);
+        auto area = getLocalBounds().reduced(theme::margin * 2);
+        area.removeFromTop   (theme::margin * 3);
+
         auto bottom = area.removeFromBottom(theme::height * 2 + theme::margin);
-        button_cal_add.setBounds(bottom.removeFromRight(theme::label_width).withTrimmedLeft(theme::margin));
         auto line = bottom.removeFromBottom(theme::height);
         line.removeFromLeft(theme::label_width);
-        int edit_width = (line.getWidth() - theme::label_width) / 2;
-        editor_cal_channels.at(LEFT).setBounds(line.removeFromLeft(edit_width));
+        button_cal_add.setBounds(line.removeFromRight(theme::button_width));
+        auto edit_width = line.getWidth() / 3;
+        editor_cal_channels.at(LEFT).setBounds(line.removeFromLeft(edit_width - 5));
         line.removeFromLeft(theme::margin);
-        editor_cal_channels.at(RIGHT).setBounds(line.removeFromLeft(edit_width));
-        line.removeFromLeft(theme::margin);
+        editor_cal_channels.at(RIGHT).setBounds(line.removeFromLeft(edit_width - 5));
+        line.removeFromLeft(theme::margin); // bug: на этой границе положение меняется скачками
+        line.removeFromRight(theme::margin);
         combo_prefix.setBounds(line);
+
         bottom.removeFromBottom(theme::margin);
         bottom.removeFromLeft(theme::label_width);
         editor_cal_name.setBounds(bottom.removeFromBottom(theme::height));
         area.removeFromBottom(theme::margin);
-        checkbox_cal.setBounds(area.removeFromTop(theme::height));
-        area.removeFromTop(theme::margin);
         table_cals.setBounds(area);
+
+        group.setBounds(getLocalBounds());
+        _theme->set_header_checkbox_bounds(checkbox_cal);
     }
 
+    size_t get_table_height() {
+        return table_cals.getHeight();
+    }
+
+    // bug: ширина кнопок меняется скачками
     Component* refreshComponentForCell(int row, int column_id, bool /*selected*/, Component* component) override
     {
         if (columns.at(column_id - 1).type == cell_data_t::button)
@@ -303,14 +314,15 @@ private:
     vector<cal_t>        rows;
     int                  selected = -1;
     signal_            & signal;
-    TableListBox         table_cals;
-    array<TextEditor, 2> editor_cal_channels;
-    TextEditor           editor_cal_name;
-    ComboBox             combo_prefix;
-    TextButton           button_cal_add;
+    GroupComponent       group;
+    ToggleButton         checkbox_cal       {     L"Use Calibration" };
     Label                label_cal_add      { {}, L"Name"            },
                          label_cal_channels { {}, L"Left/Right"      };
-    ToggleButton         checkbox_cal       {     L"Use Calibration" };
+    TableListBox         table_cals;
+    TextEditor           editor_cal_name;
+    array<TextEditor, 2> editor_cal_channels;
+    ComboBox             combo_prefix;
+    TextButton           button_cal_add;
 
     String getAttributeNameForColumnId(const int columnId) const
     {

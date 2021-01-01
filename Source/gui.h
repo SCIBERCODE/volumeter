@@ -81,17 +81,28 @@ public:
 
         addAndMakeVisible(button_zero);
         addAndMakeVisible(button_stat_reset);
+        addAndMakeVisible(button_pause_graph);
 
-        button_zero.setButtonText(L"Set zero");
         button_stat_reset.setButtonText(L"Reset stat");
+        button_zero.setButtonText(L"Set zero");
+        button_pause_graph.setButtonText(L"Pause graph");
 
+        button_pause_graph.setClickingTogglesState(true);
         button_zero.setClickingTogglesState(true);
+
         button_zero.onClick = [this]
         {
             if (button_zero.getToggleState())
                 signal.zero_set();
             else
                 signal.zero_clear();
+        };
+        button_pause_graph.setToggleState(_opt->get_int(L"button_pause_graph"), dontSendNotification);
+        button_pause_graph.onClick = [this]
+        {
+            auto value = button_pause_graph.getToggleState();
+            button_pause_graph.setButtonText(value ? L"Resume graph" : L"Pause graph");
+            _opt->save(L"button_pause_graph", value);
         };
 
         button_stat_reset.onClick = [this] { signal.minmax_clear(); };
@@ -100,7 +111,7 @@ public:
         addAndMakeVisible(calibrations_component);
         calibrations_component.update();
 
-        setSize(430, 680);
+        setSize(430, 790);
         startTimer(100);
 
         setAudioChannels(2, 2);
@@ -211,7 +222,7 @@ public:
         signal.next_audio_block(buffer);
     }
 
-    void resized() override
+    void resized() override // todo: при достаточной ширине менять вёрстку
     {
         auto area = getLocalBounds().reduced(theme::margin * 2);
         auto combo_with_label = [&](ComboBox& combo)
@@ -228,10 +239,6 @@ public:
             combo_with_label(combo_dev_outputs);
             combo_with_label(combo_dev_rates);
 
-            // фильтр
-            filter_component.setBounds(area.removeFromTop(theme::height));
-            area.removeFromTop(theme::margin * 2 + theme::height);
-
             // middle settings
             auto line = area.removeFromTop(theme::height);
             line.removeFromLeft(theme::label_width);
@@ -246,12 +253,17 @@ public:
         // снизу вверх
         {
             area.removeFromBottom(theme::margin);
-            calibrations_component.setBounds(area.removeFromBottom(220));
+            // фильтр
+            filter_component.setBounds(area.removeFromBottom(95));
+            area.removeFromBottom(theme::margin);
+            calibrations_component.setBounds(area.removeFromBottom(250));
 
             // stat
             area.removeFromBottom(theme::margin * 2);
             auto line = area.removeFromBottom(theme::height);
             button_zero.setBounds(line.removeFromRight(theme::button_width));
+            line.removeFromRight(theme::margin);
+            button_pause_graph.setBounds(line.removeFromRight(theme::button_width));
             line.removeFromRight(theme::margin);
             button_stat_reset.setBounds(line.removeFromRight(theme::button_width));
 
@@ -300,10 +312,12 @@ public:
         rms.push_back(abs(rms.at(LEFT) - rms.at(RIGHT)));
         signal.minmax_set(rms);
 
-        if (isfinite(rms.at(LEFT))) { // todo: syncrochannels
-            history_stat->enqueue(LEFT,  static_cast<float>(rms.at(LEFT)));
-            history_stat->enqueue(RIGHT, static_cast<float>(rms.at(RIGHT)));
-            repaint();
+        if (!button_pause_graph.getToggleState()) {
+            if (isfinite(rms.at(LEFT))) { // todo: syncrochannels
+                history_stat->enqueue(LEFT,  static_cast<float>(rms.at(LEFT)));
+                history_stat->enqueue(RIGHT, static_cast<float>(rms.at(RIGHT)));
+                repaint(); //#
+            }
         }
 
         array<String, 3> printed;
@@ -333,7 +347,7 @@ public:
 
         float offset = 0;
         float value;
-        if (history_stat->get_first_value(LEFT, history_plot.getWidth(), value)) // todo: устранить мерцание при заполнении буфера
+        if (history_stat->get_first_value(LEFT, history_plot.getWidth(), value)) // bug: устранить мерцание при заполнении буфера
         {
             Path path;
             do {
@@ -367,7 +381,7 @@ private:
                  label_buff_size    { {}, L"Buff size"   };
     ToggleButton checkbox_tone      {     L"Tone"        };
 
-    TextButton                     button_zero, button_stat_reset;
+    TextButton                     button_zero, button_stat_reset, button_pause_graph;
     ComboBox                       combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
     theme::checkbox_right_text_lf_ theme_right_text;
 

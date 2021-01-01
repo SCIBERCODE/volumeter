@@ -142,10 +142,12 @@ class signal_
 {
 public:
 
-    signal_() :
-        sample_rate(_opt->get_int(L"sample_rate")),
-        order      (_opt->get_int(L"order"))
+    signal_()
     {
+        sample_rate         = _opt->get_int(L"sample_rate");
+        order.at(HIGH_PASS) = _opt->get_int(L"pass_high_order");
+        order.at(LOW_PASS)  = _opt->get_int(L"pass_low_order");
+
         zero.fill(0.0);
         minmax_clear();
     }
@@ -201,8 +203,8 @@ public:
         if (buff)
             buff->clear();
     }
-    void set_order(int new_order) {
-        order = new_order;
+    void set_order(filter_type_t filter_type, int new_order) {
+        order.at(filter_type) = new_order;
     }
     vector<double> get_rms() {
         vector<double> result;
@@ -214,20 +216,20 @@ public:
         return result;
     }
 
-    void filter_init()
+    void filter_init(filter_type_t filter_type)
     {
         lock_guard<mutex> locker(audio_process);
         for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
-            if (_opt->get_int(L"pass_high"))
+            if (filter_type == HIGH_PASS) // _opt->get_int(L"pass_high"))
             {
-                iir_coeff high_pass(order, filter_type::high);
+                iir_coeff high_pass(order.at(filter_type), filter_type::high);
                 butterworth_iir(high_pass, 20.0 / sample_rate, 3.0);
                 filter.at(channel).at(HIGH_PASS) = make_unique<iir<float_type, float_type>>(high_pass);
             }
-            if (_opt->get_int(L"pass_low"))
+            if (filter_type == LOW_PASS) //_opt->get_int(L"pass_low"))
             {
-                iir_coeff low_pass(order, filter_type::low);
+                iir_coeff low_pass(order.at(filter_type), filter_type::low);
                 butterworth_iir(low_pass, _opt->get_int(L"pass_low_value") / sample_rate, 3.0);
                 filter.at(channel).at(LOW_PASS) = make_unique<iir<float_type, float_type>>(low_pass);
             }
@@ -242,7 +244,8 @@ public:
         osc.set_freq(static_cast<float>(_opt->get_int(L"tone_value")));
         osc.reset();
 
-        filter_init();
+        filter_init(HIGH_PASS);
+        filter_init(LOW_PASS);
     }
 
     void next_audio_block(const AudioSourceChannelInfo& buffer)
@@ -255,7 +258,7 @@ public:
                 auto write         = buffer.buffer->getArrayOfWritePointers();
                 auto use_high_pass = _opt->get_int(L"pass_high") && filter.at(LEFT).at(HIGH_PASS) && filter.at(RIGHT).at(HIGH_PASS);
                 auto use_low_pass  = _opt->get_int(L"pass_low")  && filter.at(LEFT).at(LOW_PASS)  && filter.at(RIGHT).at(LOW_PASS);
-                auto use_tone      = _opt->get_int(L"tone");
+                auto use_tone      = _opt->get_int(L"tone"); // todo: ускорить работу в этой процедуре
 
                 for (auto channel = LEFT; channel <= RIGHT; channel++)
                     for (auto sample_index = 0; sample_index < buffer.numSamples; ++sample_index)
@@ -278,12 +281,12 @@ public:
     }
 
 private:
-    double                     sample_rate;
-    size_t                     order;
-    mutex                      audio_process;
-    sin_                       osc;
-    unique_ptr<circle_>        buff;
-    array<double, 2>           zero;                                    // [LEFT>RIGHT        ]
-    array<array<double, 2>, 3> minmax;                                  // [LEFT>RIGHT>BALANCE][MIN>MAX]
-    array<array<unique_ptr<iir<float_type, float_type>>, 2>, 2> filter; // [LEFT>RIGHT        ][HIGH_PASS>LOW_PASS]
+    double                                      sample_rate;
+    array<size_t, 2>                            order;                                 // [HIGH_PASS>LOW_PASS]
+    mutex                                       audio_process;
+    sin_                                        osc;
+    unique_ptr<circle_>                         buff;
+    array<double, 2>                            zero;                                  // [LEFT>RIGHT        ]
+    array<array<double, STAT_SIZE>, LEVEL_SIZE> minmax;                                // [LEFT>RIGHT>BALANCE][MIN>MAX]
+    array<array<unique_ptr<iir<float_type, float_type>>, FILTER_TYPE_SIZE>, 2> filter; // [LEFT>RIGHT        ][HIGH_PASS>LOW_PASS]
 };

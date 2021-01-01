@@ -9,22 +9,24 @@ protected:
 
     const map<String, option> options = {
         { L"combo_dev_type",     { L"device_type",        L"ASIO"  } },
-        { L"combo_dev_output",   { L"device",             L""      } },
+        { L"combo_dev_output",   { L"device",             { }      } },
         { L"combo_dev_rate",     { L"sample_rate",        L"44100" } },
-        { L"checkbox_high_pass", { L"pass_high",          L"0"     } },
-        { L"checkbox_low_pass",  { L"pass_low",           L"0"     } },
-        { L"slider_freq_high",   { L"pass_low_value",     L"15000" } },
-        { L"combo_order",        { L"order",              L"120"   } },
         { L"combo_buff_size",    { L"buff_size",          L"500"   } },
         { L"checkbox_tone",      { L"tone",               L"0"     } },
         { L"combo_tone",         { L"tone_value",         L"1000"  } },
-        // calibrations component
+        { L"button_pause_graph", { L"graph_paused",       L"0"     } },
+        // калибровка
         { L"checkbox_cal",       { L"calibrate",          L"0"     } },
-        { L"combo_prefix",       { L"prefix",             L"0"     } },
-        { L"table_cals",         { L"calibrations",       L""      } },
+        { L"table_cals",         { L"calibrations",       { }      } },
         { L"table_cals_row",     { L"calibrations_index", L"-1"    } },
-
-        { L"checkbox_filter",    { L"filter",             L"0"     } }
+        { L"combo_prefix",       { L"prefix",             L"0"     } },
+        // фильтры
+        { { },                   { L"pass_high",          L"0"     } }, // todo: объединить в файле конфигурации
+        { { },                   { L"pass_low",           L"0"     } },
+        { { },                   { L"pass_high_freq",     L"20"    } },
+        { { },                   { L"pass_low_freq",      L"15000" } },
+        { { },                   { L"pass_high_order",    L"120"   } },
+        { { },                   { L"pass_low_order",     L"120"   } },
     };
 
 public:
@@ -76,7 +78,9 @@ private:
             return request;
 
         auto find = find_if(options.begin(), options.end(),
-            [request](const auto& obj) { return obj.second.xml_name == request; });
+            [request](const auto& obj) {
+            return obj.second.xml_name == request;
+        });
 
         if (find != options.end())
             return find->first;

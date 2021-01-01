@@ -4,6 +4,8 @@
 #include "theme.h"
 #include "settings.h"
 
+extern unique_ptr<theme::light_> _theme;
+
 const map<int, String> _prefs = {
     { -15, L"f" },
     { -12, L"p" },
@@ -30,7 +32,8 @@ enum stat_t : size_t {
 
 enum filter_type_t : size_t {
     HIGH_PASS = 0,
-    LOW_PASS
+    LOW_PASS,
+    FILTER_TYPE_SIZE
 };
 
 enum labels_stat_column_t : size_t {
@@ -68,7 +71,7 @@ protected:
     {
     public:
         main_window_ (const String& name, Component* component, JUCEApplication& a) :
-            DocumentWindow(name, theme::grey_level(239), DocumentWindow::allButtons),
+            DocumentWindow(name, _theme->get_bg_color(), DocumentWindow::allButtons),
             app(a)
         {
             setUsingNativeTitleBar(false);
@@ -91,7 +94,6 @@ protected:
     };
 
 private:
-
     unique_ptr<main_window_> main_window;
-    theme::light_            theme;
+
 };
