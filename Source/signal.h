@@ -221,16 +221,16 @@ public:
         lock_guard<mutex> locker(audio_process);
         for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
-            if (filter_type == HIGH_PASS) // _opt->get_int(L"pass_high"))
+            if (filter_type == HIGH_PASS)
             {
                 iir_coeff high_pass(order.at(filter_type), filter_type::high);
-                butterworth_iir(high_pass, 20.0 / sample_rate, 3.0);
+                butterworth_iir(high_pass, _opt->get_int(L"pass_high_freq") / sample_rate, 3.0);
                 filter.at(channel).at(HIGH_PASS) = make_unique<iir<float_type, float_type>>(high_pass);
             }
-            if (filter_type == LOW_PASS) //_opt->get_int(L"pass_low"))
+            if (filter_type == LOW_PASS)
             {
                 iir_coeff low_pass(order.at(filter_type), filter_type::low);
-                butterworth_iir(low_pass, _opt->get_int(L"pass_low_value") / sample_rate, 3.0);
+                butterworth_iir(low_pass, _opt->get_int(L"pass_low_freq") / sample_rate, 3.0);
                 filter.at(channel).at(LOW_PASS) = make_unique<iir<float_type, float_type>>(low_pass);
             }
         }

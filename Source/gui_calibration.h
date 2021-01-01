@@ -75,7 +75,7 @@ public:
                 channels_text.at(RIGHT).getDoubleValue() * pow(10.0, pref)
             };
 
-            auto cals = _opt->get_xml(L"table_cals");
+            auto cals = _opt->get_xml(L"calibrations");
             if (cals == nullptr)
                 cals = make_unique<XmlElement>(StringRef(L"ROWS"));
 
@@ -88,7 +88,7 @@ public:
             e->setAttribute(Identifier(L"right"),       channels.at(RIGHT));
             e->setAttribute(Identifier(L"right_coeff"), channels.at(RIGHT) / rms.at(RIGHT)); // todo: check for nan
 
-            _opt->save(L"table_cals", cals.get());
+            _opt->save(L"calibrations", cals.get());
             update();
         };
     }
@@ -100,7 +100,7 @@ public:
     void update()
     {
         rows.clear();
-        auto cals = _opt->get_xml(L"table_cals");
+        auto cals = _opt->get_xml(L"calibrations");
         if (cals != nullptr) {
             forEachXmlChildElement(*cals, el)
             {
@@ -113,7 +113,7 @@ public:
                 });
             }
         }
-        selected = _opt->get_int(L"table_cals_row");
+        selected = _opt->get_int(L"calibrations_index");
         table_cals.updateContent();
     };
 
@@ -132,7 +132,7 @@ public:
     void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на всём компоненте
         auto current = table_cals.getSelectedRow();
         selected = current == selected ? -1 : current;
-        _opt->save(L"table_cals_row", selected);
+        _opt->save(L"calibrations_index", selected);
         repaint();
     }
 
@@ -227,16 +227,16 @@ public:
         if (selected == del_row)
         {
             selected = -1;
-            _opt->save(L"table_cals_row", selected);
+            _opt->save(L"calibrations_index", selected);
         }
         else if (del_row < selected)
         {
             selected--;
-            _opt->save(L"table_cals_row", selected);
+            _opt->save(L"calibrations_index", selected);
         }
         table_cals.updateContent();
 
-        auto cals = _opt->get_xml(L"table_cals");
+        auto cals = _opt->get_xml(L"calibrations");
         if (cals == nullptr) {
             cals = make_unique<XmlElement>(StringRef(L"ROWS"));
             cals->createNewChildElement(StringRef(L"SELECTION"))->setAttribute(Identifier(L"cal_index"), -1);
@@ -252,7 +252,7 @@ public:
             e->setAttribute(Identifier(L"right"),       row.channel.at(RIGHT));
             e->setAttribute(Identifier(L"right_coeff"), row.coeff.at  (RIGHT));
         }
-        _opt->save(L"table_cals", cals.get());
+        _opt->save(L"calibrations", cals.get());
     }
 
 //=========================================================================================

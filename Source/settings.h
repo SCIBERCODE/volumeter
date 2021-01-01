@@ -2,12 +2,12 @@
 
 class settings_ {
 protected:
-    struct option {
+    struct option_t {
         String xml_name;
         String default_value;
     };
 
-    const map<String, option> options = {
+    const multimap<String, option_t> options = {
         { L"combo_dev_type",     { L"device_type",        L"ASIO"  } },
         { L"combo_dev_output",   { L"device",             { }      } },
         { L"combo_dev_rate",     { L"sample_rate",        L"44100" } },
@@ -17,14 +17,14 @@ protected:
         { L"button_pause_graph", { L"graph_paused",       L"0"     } },
         // калибровка
         { L"checkbox_cal",       { L"calibrate",          L"0"     } },
-        { L"table_cals",         { L"calibrations",       { }      } },
-        { L"table_cals_row",     { L"calibrations_index", L"-1"    } },
         { L"combo_prefix",       { L"prefix",             L"0"     } },
+        { { },                   { L"calibrations",       { }      } },
+        { { },                   { L"calibrations_index", L"-1"    } },
         // фильтры
         { { },                   { L"pass_high",          L"0"     } }, // todo: объединить в файле конфигурации
         { { },                   { L"pass_low",           L"0"     } },
-        { { },                   { L"pass_high_freq",     L"20"    } },
-        { { },                   { L"pass_low_freq",      L"15000" } },
+        { { },                   { L"pass_high_freq",     { }      } },
+        { { },                   { L"pass_low_freq",      { }      } },
         { { },                   { L"pass_high_order",    L"120"   } },
         { { },                   { L"pass_low_order",     L"120"   } },
     };
@@ -42,54 +42,50 @@ public:
 
     template <typename T>
     void save(const String& component_name, T value) {
-        if (key_exists(component_name)) {
-            settings.getUserSettings()->setValue(options.at(get_key(component_name)).xml_name, value);
+        if (auto option = get_option(component_name)) {
+            settings.getUserSettings()->setValue(option->xml_name, value);
             settings.saveIfNeeded();
         }
     }
 
     String get_text(const String& component_name) {
-        if (key_exists(component_name))
+        if (auto option = get_option(component_name))
             return settings.getUserSettings()->getValue
             (
-                options.at(get_key(component_name)).xml_name,
-                options.at(get_key(component_name)).default_value
+                option->xml_name,
+                option->default_value
             );
 
         return String();
     }
 
     int get_int(const String& component_name) {
-        return key_exists(component_name) ? get_text(get_key(component_name)).getIntValue() : 0;
+        auto str_value = get_text(component_name);
+        return str_value.isNotEmpty() ? str_value.getIntValue() : 0;
     }
 
     auto get_xml(const String& component_name) {
-        if (key_exists(component_name))
-            return settings.getUserSettings()->getXmlValue(options.at(get_key(component_name)).xml_name);
+        if (auto option = get_option(component_name))
+            return settings.getUserSettings()->getXmlValue(option->xml_name);
 
         return unique_ptr<XmlElement>{ };
     }
 
 private:
-    // ищем по имени контрола, потому как преимущественно настройки запрашивает гуй
-    // после глядим в именах опций непосредственно использующихся в файле конфига
-    String get_key(const String& request) {
-        if (options.count(request) > 0)
-            return request;
+    // поиск как по ключам, так и по строкам конфига
+    const option_t* get_option(const String& request) {
+        auto find_key = options.find(request);
+
+        if (find_key != options.end() && find_key->first.isNotEmpty())
+            return &find_key->second;
 
         auto find = find_if(options.begin(), options.end(),
-            [request](const auto& obj) {
-            return obj.second.xml_name == request;
-        });
+            [request](const auto& obj) { return obj.second.xml_name == request; });
 
         if (find != options.end())
-            return find->first;
+            return &find->second;
 
-        return String();
-    }
-
-    bool key_exists(const String& request) {
-        return get_key(request).length() > 0;
+        return { };
     }
 
     ApplicationProperties settings;

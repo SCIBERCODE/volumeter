@@ -55,12 +55,29 @@ public:
             // поле для ввода частоты
             label->setText("Freq/Order", dontSendNotification);
             label->setJustificationType(Justification::centredRight);
-            edit->setText(_opt->get_text(option + L"_freq"), false);
+
+            auto check_input = [&](ToggleButton *check, String value_str)
+            {
+                auto value_int = value_str.getIntValue();
+                auto enabled = value_int > 0 && value_int <= _opt->get_int(L"sample_rate") / 2;
+                check->setEnabled(enabled);
+                if (!enabled) check->setToggleState(false, sendNotification);
+                return enabled;
+            };
+
             edit->onTextChange = [&, type, option]
             {
                 auto value = edit_freq.at(type)->getText();
-                _opt->save(option + L"_freq", value);
+                if (check_input(checkbox_type.at(type).get(), value) || value.isEmpty()) {
+                    _opt->save(option + L"_freq", value);
+                    signal.filter_init(type);
+                }
             };
+
+            edit->setInputRestrictions(0, L"0123456789.");
+            auto value = _opt->get_text(option + L"_freq");
+            if (check_input(button, value))
+                edit->setText(value, true);
 
             // выпадайка с порядком фильтра
             for (auto const item : order_list)
@@ -102,7 +119,16 @@ public:
 
     void prepare_to_play(double sample_rate)
     {
-        // todo: проверять и при необходимости корректировать частоты
+        auto max_freq = sample_rate / 2;
+        auto empty_message = "1 .. " + String(max_freq) + L" Hz";
+        for (auto type = HIGH_PASS; type < FILTER_TYPE_SIZE; type++)
+        {
+            auto edit = edit_freq.at(type).get();
+            edit->setTextToShowWhenEmpty(empty_message, Colours::grey);
+            auto value = edit->getText().getIntValue();
+            if (value > max_freq)
+                edit->setText(String(max_freq), true);
+        }
     }
 
 private:
