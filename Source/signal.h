@@ -83,11 +83,15 @@ public:
 
     void enqueue(level_t channel, float value)
     {
-        if (max_size && value)
+        if (max_size && isfinite(value))
         {
             buffer.at(channel)[tail.at(channel)] = value;
             tail.at(channel) = (tail.at(channel) + 1) % max_size;
         }
+    }
+
+    float get_tail(level_t channel) {
+        return buffer.at(channel)[tail.at(channel)];
     }
 
     double get_rms(level_t channel)
@@ -107,7 +111,7 @@ public:
     }
 
     bool get_first_value(level_t channel, size_t size, float& value) {
-        if (size == 0 || size > max_size || tail.at(channel) == 0)
+        if (size == 0 || size > max_size || /* bug: исправить логику */ tail.at(channel) == 0)
             return false;
 
         it.pointer = tail.at(channel) - 1;
@@ -139,7 +143,8 @@ public:
         float value;
 
         if (get_first_value(channel, size, value)) {
-            minmax.at(MAX) = value + 0.00001f;
+            minmax.at(MIN) = value;
+            minmax.at(MAX) = value + 0.00001f; // todo: избавиться
             do {
                 if (!isfinite(value)) break;
                 minmax.at(MIN) = min(value, minmax.at(MIN));

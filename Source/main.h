@@ -24,6 +24,12 @@ enum level_t : size_t {
     LEVEL_SIZE
 };
 
+const map<level_t, String> _stat_captions = {
+    { LEFT,    L"Left"    },
+    { RIGHT,   L"Right"   },
+    { BALANCE, L"Balance" }
+};
+
 enum stat_t : size_t {
     MIN = 0,
     MAX,

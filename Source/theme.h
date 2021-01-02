@@ -13,6 +13,7 @@ namespace theme
     const size_t margin       = 5;
     const size_t label_width  = 80;
     const size_t button_width = 100;
+    const auto   graph_indent = 15.0f;
     const auto   empty        = L"--";
     const auto   font_height  = 15.0f;
 
@@ -37,6 +38,10 @@ namespace theme
             setColour(TextEditor::ColourIds::highlightedTextColourId, black);
             setColour(Slider::textBoxBackgroundColourId, white);
             setColour(ResizableWindow::backgroundColourId, bg);
+
+            setColour(TooltipWindow::backgroundColourId, white);
+            setColour(TooltipWindow::outlineColourId, black);
+            setColour(TooltipWindow::textColourId, black);
         }
 
         auto get_bg_color() {
@@ -144,30 +149,33 @@ namespace theme
         void drawToggleButton(Graphics& g, ToggleButton& button,
             bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
         {
-            auto fontSize = jmin(font_height, button.getHeight() * 0.75f);
-            auto tickWidth = fontSize * 1.1f;
+            auto font_size = jmin(font_height, button.getHeight() * 0.75f);
+            auto tick_width = font_size * 1.1f;
 
-            if (button.getName() != L"b")
-                drawTickBox(g, button, 4.0f, (button.getHeight() - tickWidth) * 0.5f,
-                    tickWidth, tickWidth,
+            auto props = button.getProperties();
+            bool show_tick = !props.contains(Identifier(L"dont_show_tick"));
+            if (show_tick) {
+                drawTickBox(g, button, 4.0f, (button.getHeight() - tick_width) * 0.5f,
+                    tick_width, tick_width,
                     button.getToggleState(),
                     button.isEnabled(),
                     shouldDrawButtonAsHighlighted,
                     shouldDrawButtonAsDown);
+            }
             else
-                tickWidth = 0.0f;
+                tick_width = 0.0f;
 
-            g.setColour(button.getName() != L"rm" ? button.findColour(ToggleButton::textColourId) : Colours::green);
+            g.setColour(button.findColour(ToggleButton::textColourId));
             Font font(14.0f);
-            g.setFont(button.getToggleState() ? font.boldened() : font);
+            g.setFont(show_tick && button.getToggleState() ? font.boldened() : font);
 
             if (!button.isEnabled())
                 g.setOpacity(0.5f);
 
             g.drawFittedText(button.getButtonText(),
-                button.getLocalBounds().withTrimmedLeft(roundToInt(tickWidth) + 10)
-                .withTrimmedRight(2),
+                button.getLocalBounds().withTrimmedLeft(roundToInt(tick_width) + 10).withTrimmedRight(2),
                 Justification::centredRight, 10);
+
         }
     };
 

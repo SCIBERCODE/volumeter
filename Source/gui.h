@@ -20,12 +20,7 @@ public:
         calibrations_component(signal),
         filter_component      (signal)
     {
-        auto display_width = 0;
-        for (auto display : Desktop::getInstance().getDisplays().displays)
-            display_width += display.userArea.getWidth();
-
-        history_stat = make_unique<circle_>(display_width);
-
+        clear_graph();
         load_devices();
 
         // === middle settings ============================================================
@@ -64,30 +59,35 @@ public:
             _opt->save(L"combo_tone", value);
         };
 
-        // === stat =======================================================================
-        const array<String, 3> stat_captions = { L"Left", L"Right", L"Balance" }; // todo: центровать цифры по точке
+        // === stat ======================================================================= // todo: центровать цифры по точке
         for (auto line = LEFT; line < LEVEL_SIZE; line++) { // todo: заменить таблицей
             for (auto column = LABEL; column < LABELS_STAT_COLUMN_SIZE; column++)
             {
                 if (column == LABEL)
                 {
                     auto checkbox = make_unique<ToggleButton>();
-                    checkbox->setButtonText(stat_captions.at(line));
                     addAndMakeVisible(checkbox.get());
+                    checkbox->setButtonText(_stat_captions.at(line));
                     checkbox->setLookAndFeel(&theme_right_text);
-                    if (line == BALANCE) checkbox->setName(L"b");
-                    if (line == RIGHT) checkbox->setName(L"r");
+                    if (line != BALANCE) checkbox->setTooltip("Show " + _stat_captions.at(line).toLowerCase() + " channel on the graph");
+                    switch (line) {
+                    case LEFT   : checkbox->setToggleState(_opt->get_int    (L"graph_left"),  dontSendNotification);
+                                  checkbox->onClick = [&, line] { _opt->save(L"graph_left", check_stat.at(line)->getToggleState()); }; break;
+                    case RIGHT  : checkbox->setToggleState (_opt->get_int   (L"graph_right"), dontSendNotification);
+                                  checkbox->onClick = [&, line] { _opt->save(L"graph_right", check_stat.at(line)->getToggleState()); }; break;
+                    case BALANCE: checkbox->getProperties().set  (Identifier(L"dont_show_tick"), true); break;
+                    }
                     check_stat.at(line) = move(checkbox);
                 }
                 else {
-                    auto label = make_unique<Label>();
+                    auto label = make_unique<Label>(); // todo: сработка соответствующих галочек при нажатии на цифры показометра
                     addAndMakeVisible(label.get());
-                    label_stat.at(line).at(column-1) = move(label);
+                    label_stat.at(line).at(column - 1) = move(label);
                 }
             }
-            auto label_value = label_stat.at(line).at(VALUE-1).get();
-            label_stat.at(line).at(VALUE-1) ->setFont(label_value->getFont().boldened());
-            label_stat.at(line).at(MINMAX-1)->setJustificationType(Justification::right);
+            auto label_value = label_stat.at(line).at(VALUE - 1).get();
+            label_stat.at(line).at(VALUE  - 1) ->setFont(label_value->getFont().boldened());
+            label_stat.at(line).at(MINMAX - 1)->setJustificationType(Justification::right);
         }
 
         addAndMakeVisible(button_zero);
@@ -126,7 +126,11 @@ public:
             _opt->save(L"button_pause_graph", value);
         };
 
-        button_stat_reset.onClick = [this] { signal.minmax_clear(); };
+        button_stat_reset.onClick = [this]
+        {
+            signal.minmax_clear();
+            clear_graph();
+        };
 
         addAndMakeVisible(filter_component);
         addAndMakeVisible(calibrations_component);
@@ -141,7 +145,17 @@ public:
     ~main_component_() override
     {
         shutdownAudio();
+
         checkbox_tone.setLookAndFeel(nullptr);
+        for (auto line = LEFT; line < LEVEL_SIZE; line++)
+            check_stat.at(line)->setLookAndFeel(nullptr);
+    }
+
+    void clear_graph() {
+        auto display_width = 0;
+        for (auto display : Desktop::getInstance().getDisplays().displays)
+            display_width += display.userArea.getWidth();
+        history_stat = make_unique<circle_>(display_width);
     }
 
     //=====================================================================================
@@ -295,15 +309,15 @@ public:
 
             for (auto line_index = LEFT; line_index < LEVEL_SIZE; line_index++)
             {
-                check_stat.at(line_index)->setBounds(left.removeFromTop(theme::height));
-                label_stat.at(line_index).at(labels_stat_column_t::VALUE-1) ->setBounds(area.removeFromTop (theme::height));
-                label_stat.at(line_index).at(labels_stat_column_t::MINMAX-1)->setBounds(right.removeFromTop(theme::height));
+                check_stat.at(line_index)->setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin));
+                label_stat.at(line_index).at(VALUE  - 1)->setBounds(area.removeFromTop (theme::height));
+                label_stat.at(line_index).at(MINMAX - 1)->setBounds(right.removeFromTop(theme::height));
                 remain.removeFromTop(theme::height);
 
                 if (line_index < level_t::BALANCE) {
-                    area .removeFromTop (theme::margin);
-                    right.removeFromTop (theme::margin);
-                    left .removeFromTop (theme::margin);
+                    area  .removeFromTop(theme::margin);
+                    right .removeFromTop(theme::margin);
+                    left  .removeFromTop(theme::margin);
                     remain.removeFromTop(theme::margin);
                 }
             }
@@ -358,18 +372,48 @@ public:
             label_stat.at(line).at(0)->setColour(Label::textColourId, isfinite(rms.at(line)) ? Colours::black : Colours::grey);
         }
 
-        if (button_zero.isEnabled() == calibrate) button_zero.setEnabled(!calibrate); // todo: логику без этого
+        if (button_zero.isEnabled() == calibrate) { // todo: логику без этого
+            button_zero.setToggleState(false, sendNotificationSync);
+            button_zero.setEnabled(!calibrate);
+        }
     }
 
-    void paint(Graphics& g) override {
+    bool is_about_equal(float a, float b) {
+        return fabs(a - b) <= ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * (FLT_EPSILON / 10000));
+    }
+
+    bool round_flt(float value) {
+        return round(value * 10000.0f) / 10000.0f;
+    }
+
+    void paint(Graphics& g) override
+    {
         g.setColour(Colours::white);
         g.fillRect(history_plot);
 
+        const float dotted_pattern[2] = { 2.0f, 3.0f };
+        auto y_start = history_plot.getY() + theme::graph_indent;
+        auto y_end   = history_plot.getY() + history_plot.getHeight() - theme::graph_indent;
+
+        g.setColour(Colours::grey);
+        g.drawDashedLine(
+            Line<float>(static_cast<float>(history_plot.getX()), y_start, static_cast<float>(history_plot.getRight()), y_start),
+            dotted_pattern, _countof(dotted_pattern)
+        );
+        g.drawDashedLine(
+            Line<float>(static_cast<float>(history_plot.getX()), y_end, static_cast<float>(history_plot.getRight()), y_end),
+            dotted_pattern, _countof(dotted_pattern)
+        );
+
         for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
+            if (channel == LEFT  && _opt->get_int(L"graph_left" ) == 0) continue;
+            if (channel == RIGHT && _opt->get_int(L"graph_right") == 0) continue;
+
             auto  minmax = history_stat->get_minmax(channel, history_plot.getWidth());
             float offset = 0.0f;
             float value;
+            //=====================================================================================
             if (history_stat->get_first_value(channel, history_plot.getWidth(), value)) // bug: устранить мерцание при заполнении буфера
             {
                 Path path;
@@ -383,51 +427,95 @@ public:
                     path.lineTo(x, y);
                 } while (history_stat->get_next_value(value));
                 if (offset < 2) return;
-                path.scaleToFit(history_plot.getX() + (history_plot.getWidth() - offset), history_plot.getY() + 15.0f, offset, history_plot.getHeight() - 30.0f, false);
-                /*auto x = history_plot.getX() + (history_plot.getWidth() - offset);
-                auto y = history_plot.getY() + 15;
-                auto w = offset;
-                auto h = history_plot.getHeight() - 30;
-                auto bounds = path.getBounds();
-                auto trans = AffineTransform::translation(-bounds.getX(), -bounds.getY());
-                auto w2 = w / bounds.getWidth();
-                auto h2 = h / bounds.getHeight();
-                trans.scale(w2, h2);
-                auto trans2 = trans.translated(x, y);
-                path.applyTransform(trans2);*/
 
+                path.scaleToFit(
+                    history_plot.getX() + (history_plot.getWidth() - offset),
+                    y_start,
+                    offset,
+                    history_plot.getHeight() - theme::graph_indent * 2,
+                    false
+                );
                 g.setColour(channel == LEFT ? Colours::black : Colours::green);
                 g.strokePath(path, PathStrokeType(1.0f));
-
-                PathStrokeType path_stroke(1.0f);
-
-                //    const float dotted_pattern[2] = { 5.0f, 5.0f };
-                  //  path_stroke.createDashedStroke(path, path, dotted_pattern, _countof(dotted_pattern));
-
             }
+            //=====================================================================================
+            offset = 0.0f;
+            if (history_stat->get_first_value(channel, history_plot.getWidth(), value))
+                do {
+                    for (auto stat = MIN; stat < STAT_SIZE; stat++)
+                    {
+                        //if (round_flt(value) == round_flt(minmax.at(MAX)))
+                        //if (is_about_equal(value, minmax.at(MAX)))
+                        if (String(value, 3) == String(minmax.at(stat), 3))
+                        {
+                            const auto text = String(value, 3) + L" dB";
+                            const auto text_width = g.getCurrentFont().getStringWidth(text);
+                            Rectangle<int> rect =
+                            {
+                                static_cast<int>(history_plot.getRight() - offset - (text_width / 2)),
+                                static_cast<int>(stat == MAX ? y_start - 14 : y_end + 1),
+                                text_width,
+                                13
+                            };
+                            int overhung[2] = {
+                                rect.getX() - history_plot.getX(),
+                                history_plot.getRight() - rect.getRight(),
+                            };
+                            if (overhung[0] < 0) rect.setCentre(rect.getCentreX() - overhung[0], rect.getCentreY());
+                            if (overhung[1] < 0) rect.setCentre(rect.getCentreX() + overhung[1], rect.getCentreY());
+
+                            g.setColour(Colours::white);
+                            if (stat == MAX) g.fillRect(history_plot.withBottom(y_start - 1));
+                            if (stat == MIN) g.fillRect(history_plot.withTop(y_end + 1));
+
+                            g.setColour(channel == LEFT ? Colours::black : Colours::green);
+                            g.drawText(text, rect, Justification::centred, false);
+                            break;
+                        }
+                    }
+                    offset++;
+                } while (history_stat->get_next_value(value));
+        }
+        /*const size_t line_width = 30;
+        Rectangle<int> rect
+        (
+            history_plot.getX(),
+            static_cast<int>(y_end),
+            history_plot.getWidth() - theme::margin,
+            13
+        );
+        for (auto channel = LEFT; channel <= RIGHT; channel++)
+        {
+            const auto text = _stat_captions.at(channel);
+            const auto text_width = g.getCurrentFont().getStringWidth(text);
+            g.setColour(channel == LEFT ? Colours::black : Colours::green);
+            g.drawFittedText(text, rect.removeFromRight(text_width + theme::margin), Justification::centredRight, 1);
+            g.fillRect(rect.removeFromRight(line_width).withY(rect.getY() + 1).reduced(0, 6));
+            rect.removeFromRight(theme::margin);
         }
         g.setColour(Colours::grey);
-        g.drawRect(history_plot);
+        g.drawRect(history_plot);*/
     }
 
 //=========================================================================================
 private:
 //=========================================================================================
 
-    //array<array<unique_ptr<Label>,
-    array<unique_ptr<ToggleButton>, LEVEL_SIZE>    check_stat;  // [LEFT>RIGHT>BALANCE][LABEL>VALUE>MINMAX]
-    array<array<unique_ptr<Label>, 2>, LEVEL_SIZE> label_stat;  // [LEFT>RIGHT>BALANCE][LABEL>VALUE>MINMAX]
-    unique_ptr<circle_>                       history_stat;
-    signal_                                   signal;
-    calibrations_component_                   calibrations_component;
-    filter_component_                         filter_component;
-    Rectangle<int>                            history_plot;
+    array<unique_ptr<ToggleButton>, LEVEL_SIZE>    check_stat;  // [LEFT>RIGHT>BALANCE]
+    array<array<unique_ptr<Label>, 2>, LEVEL_SIZE> label_stat;  // [LEFT>RIGHT>BALANCE][VALUE>MINMAX]
+    array<array<Rectangle<int>, 2>, 2>             rect_minmax;
+    unique_ptr<circle_>                            history_stat;
+    signal_                                        signal;
+    calibrations_component_                        calibrations_component;
+    filter_component_                              filter_component;
+    Rectangle<int>                                 history_plot;
 
-    Label        label_device_type  { {}, L"Type"        },
-                 label_device       { {}, L"Device"      },
-                 label_sample_rate  { {}, L"Sample rate" },
-                 label_buff_size    { {}, L"Buff size"   };
-    ToggleButton checkbox_tone      {     L"Tone"        };
+    Label         label_device_type  { {}, L"Type"        },
+                  label_device       { {}, L"Device"      },
+                  label_sample_rate  { {}, L"Sample rate" },
+                  label_buff_size    { {}, L"Buff size"   };
+    ToggleButton  checkbox_tone      {     L"Tone"        };
+    TooltipWindow hint               { this               };
 
     TextButton                     button_zero, button_stat_reset, button_pause_graph;
     ComboBox                       combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
