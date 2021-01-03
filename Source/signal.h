@@ -6,7 +6,7 @@
 
 using namespace spuce;
 
-extern unique_ptr<settings_> _opt;
+extern unique_ptr<settings_> __opt;
 
 //=========================================================================================
 class sin_
@@ -20,33 +20,36 @@ public:
         reset();
     }
 
-    void set_sample_rate(double sample_rate) {
+    void set_sample_rate(const double sample_rate) {
         sampling_rate = sample_rate;
     }
 
     void reset() {
-        angle.fill(0.0);
+        for (auto& angle : angles)
+            angle = 0.0;
     }
 
-    void set_freq(float frequency) {
+    void set_freq(const float frequency) {
         freq = frequency;
         auto cycles_per_sample = frequency / sampling_rate;
         angle_delta = cycles_per_sample * 2.0 * M_PI;
     }
 
-    auto sample(level_t channel) {
-        auto current_sample = sin(angle.at(channel));
-        angle.at(channel) += angle_delta;
+    auto sample(const volume_t channel) {
+        auto current_sample = sin(angles[channel]);
+        angles[channel] += angle_delta;
 
-        if (angle.at(channel) > 2.0 * M_PI)
-            angle.at(channel) -= 2.0 * M_PI;
+        if (angles[channel] > 2.0 * M_PI)
+            angles[channel] -= 2.0 * M_PI;
 
         return static_cast<float>(current_sample);
     }
 
 private:
-    double           sampling_rate, freq, angle_delta;
-    array<double, 2> angle;
+    double sampling_rate,
+           freq,
+           angle_delta,
+           angles[VOLUME_SIZE];
 };
 
 //=========================================================================================
@@ -56,52 +59,55 @@ class circle_
 protected:
     struct iterator
     {
-        size_t  size;
-        size_t  pointer;
-        level_t channel;
+        size_t   size;
+        size_t   pointer;
+        volume_t channel;
     };
 private:
-    array<unique_ptr<float[]>, 2> buffer;
-    array<size_t, 2>              tail;
-    size_t                        max_size;
-    iterator                      it;
+    unique_ptr<float[]> buffers[VOLUME_SIZE];
+    size_t              tails  [VOLUME_SIZE];
+    size_t              max_size;
+    iterator            it;
 public:
-    circle_(size_t max_size)
-           : buffer({ make_unique<float[]>(max_size),
-                      make_unique<float[]>(max_size) }),
-             max_size(max_size)
+    circle_(const size_t max_size) : max_size(max_size)
     {
+        for (auto& buffer : buffers)
+            buffer = make_unique<float[]>(max_size);
+
         clear();
     }
 
     void clear()
     {
-        if (buffer.at(LEFT )) fill_n(buffer.at(LEFT ).get(), max_size, numeric_limits<float>::quiet_NaN());
-        if (buffer.at(RIGHT)) fill_n(buffer.at(RIGHT).get(), max_size, numeric_limits<float>::quiet_NaN());
-        tail.fill(0);
-    }
+        for (auto line = LEFT; line < VOLUME_SIZE; line++) {
+            if (buffers[line])
+                fill_n(buffers[line].get(), max_size, numeric_limits<float>::quiet_NaN());
 
-    void enqueue(level_t channel, float value)
-    {
-        if (max_size && isfinite(value))
-        {
-            buffer.at(channel)[tail.at(channel)] = value;
-            tail.at(channel) = (tail.at(channel) + 1) % max_size;
+            tails[line] = 0;
         }
     }
 
-    float get_tail(level_t channel) {
-        return buffer.at(channel)[tail.at(channel)];
+    void enqueue(const volume_t channel, const float value)
+    {
+        if (max_size && isfinite(value))
+        {
+            buffers[channel][tails[channel]] = value;
+            tails[channel] = (tails[channel] + 1) % max_size;
+        }
     }
 
-    double get_rms(level_t channel)
+    float get_tail(const volume_t channel) {
+        return buffers[channel][tails[channel]];
+    }
+
+    double get_rms(const volume_t channel)
     {
         double sum = 0.0;
         size_t size = 0;
 
         for (size_t k = 0; k < max_size; ++k)
         {
-            auto sample = buffer.at(channel)[k];
+            auto sample = buffers[channel][k];
             if (isfinite(sample)) {
                 sum += sample;
                 size++;
@@ -110,21 +116,21 @@ public:
         return sqrt(sum / size);
     }
 
-    bool get_first_value(level_t channel, size_t size, float& value) {
-        if (size == 0 || size > max_size || /* bug: исправить логику */ tail.at(channel) == 0)
+    bool get_first_value(const volume_t channel, const size_t size, float& value) {
+        if (size == 0 || size > max_size || /* bug: исправить логику */ tails[channel] == 0)
             return false;
 
-        it.pointer = tail.at(channel) - 1;
+        it.pointer = tails[channel] - 1;
         it.size    = size;
         it.channel = channel;
         return get_next_value(value);
     }
 
     bool get_next_value(float& value) {
-        value = numeric_limits<float>::quiet_NaN();
+        auto result = numeric_limits<float>::quiet_NaN();
         if (it.pointer >= 0 && it.size)
         {
-            value = buffer.at(it.channel)[it.pointer];
+            result = buffers[it.channel][it.pointer];
             if (it.pointer == 0)
                 it.pointer = max_size - 1;
             else
@@ -132,45 +138,60 @@ public:
 
             it.size--;
         };
-        if (!isfinite(value))
+        if (!isfinite(result))
             it = { 0 };
 
-        return isfinite(value);
+        if (isfinite(result))
+            value = result;
+
+        return isfinite(result);
     }
 
-    auto get_minmax(level_t channel, size_t size) {
-        array<float, STAT_SIZE> minmax = { 0.0f, 0.0f };
+    auto get_extremes(const volume_t channel, const size_t size) {
+        auto  result = make_unique<float[]>(EXTREMES_SIZE);
         float value;
 
         if (get_first_value(channel, size, value)) {
-            minmax.at(MIN) = value;
-            minmax.at(MAX) = value + 0.00001f; // todo: избавиться
+            result[MIN] = value;
+            result[MAX] = value + 0.00001f; // todo: избавиться
             do {
                 if (!isfinite(value)) break;
-                minmax.at(MIN) = min(value, minmax.at(MIN));
-                minmax.at(MAX) = max(value, minmax.at(MAX));
+                result[MIN] = min(value, result[MIN]);
+                result[MAX] = max(value, result[MAX]);
             }
             while (get_next_value(value));
         }
-       return minmax;
+       return result;
     }
-};
 
+private:
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(circle_)
+
+};
 
 //=========================================================================================
 class signal_
 //=========================================================================================
 {
+private:
+    double              sample_rate;
+    mutex               audio_process;
+    sin_                osc;
+    unique_ptr<circle_> buff;
+    unique_ptr<iir<float_type, float_type>>
+                        filters [VOLUME_SIZE][FILTER_TYPE_SIZE];
+    size_t              orders               [FILTER_TYPE_SIZE];
+    double              extremes[VOLUME_SIZE][EXTREMES_SIZE];
+    double              zeros   [VOLUME_SIZE];
 public:
 
     signal_()
     {
-        sample_rate         = _opt->get_int(L"sample_rate");
-        order.at(HIGH_PASS) = _opt->get_int(L"pass_high_order");
-        order.at(LOW_PASS)  = _opt->get_int(L"pass_low_order");
+        sample_rate       = __opt->get_int(L"sample_rate"    );
+        orders[HIGH_PASS] = __opt->get_int(L"pass_high_order");
+        orders[LOW_PASS ] = __opt->get_int(L"pass_low_order" );
 
-        zero.fill(0.0);
-        minmax_clear();
+        zero_clear();
     }
 
     void zero_set(
@@ -179,51 +200,52 @@ public:
     {
         lock_guard<mutex> locker(audio_process);
         if (isfinite(value_left) && isfinite(value_right)) {
-            zero.at(LEFT)  = value_left;
-            zero.at(RIGHT) = value_right;
+            zeros[LEFT ] = value_left;
+            zeros[RIGHT] = value_right;
         }
         else {
-            zero.at(LEFT)  = gain2db(buff->get_rms(LEFT));
-            zero.at(RIGHT) = gain2db(buff->get_rms(RIGHT));
-            _opt->save(L"zero_value_left",  zero.at(LEFT));
-            _opt->save(L"zero_value_right", zero.at(RIGHT));
+            zeros[LEFT ] = gain2db(buff->get_rms(LEFT ));
+            zeros[RIGHT] = gain2db(buff->get_rms(RIGHT));
+            __opt->save(L"zero_value_left" , zeros[LEFT ]);
+            __opt->save(L"zero_value_right", zeros[RIGHT]);
         }
-        minmax_clear();
+        extremes_clear();
     }
-    auto zero_get(level_t channel) {
-        return zero.at(channel);
+    auto zero_get(const volume_t channel) {
+        return zeros[channel];
     }
     void zero_clear() {
-        zero.fill(0.0);
-        minmax_clear();
+        for (auto& zero : zeros) zero = 0.0;
+        extremes_clear();
     }
 
-    auto minmax_set(const vector<double>& rms) {
-        for (auto line = LEFT; line < LEVEL_SIZE; line++) // bug: на вольтах при переключении нижняя граница не похожа на правду
+    void extremes_set(const vector<double>& rms) {
+        for (auto line = LEFT; line < VOLUME_SIZE; line++) // bug: на вольтах при переключении нижняя граница не похожа на правду
             if (isfinite(rms.at(line)))
             {
-                if (!isfinite(minmax.at(line).at(MIN))) minmax.at(line).at(MIN) = rms.at(line);
-                if (!isfinite(minmax.at(line).at(MAX))) minmax.at(line).at(MAX) = rms.at(line);
-                minmax.at(line).at(MIN) = min(minmax.at(line).at(MIN), rms.at(line));
-                minmax.at(line).at(MAX) = max(minmax.at(line).at(MAX), rms.at(line));
+                if (!isfinite(extremes[line][MIN])) extremes[line][MIN] = rms.at(line);
+                if (!isfinite(extremes[line][MAX])) extremes[line][MAX] = rms.at(line);
+                extremes[line][MIN] = min(extremes[line][MIN], rms.at(line));
+                extremes[line][MAX] = max(extremes[line][MAX], rms.at(line));
             }
     }
-    auto minmax_get(level_t channel) {
-        return minmax.at(channel);
+    const auto extremes_get(const volume_t channel) {
+        return extremes[channel];
     }
-    void minmax_clear() {
-        for (auto& sub : minmax)
-            sub.fill(numeric_limits<float>::quiet_NaN());
+    void extremes_clear() {
+        for (auto& line : extremes)
+            for (auto& column : line)
+                column = numeric_limits<float>::quiet_NaN();
     }
 
-    double gain2db(double gain) {
+    double gain2db(const double gain) {
         return 20 * log10(gain);
     }
-    void set_freq(double freq) {
+    void set_freq(const double freq) {
         osc.set_freq(static_cast<float>(freq));
         osc.reset();
     }
-    void change_buff_size(int new_size) {
+    void change_buff_size(const int new_size) {
         lock_guard<mutex> locker(audio_process);
         if (new_size && sample_rate) {
             auto number_of_samples = static_cast<size_t>(new_size / (1000.0 / sample_rate));
@@ -235,8 +257,8 @@ public:
         if (buff)
             buff->clear();
     }
-    void set_order(filter_type_t filter_type, int new_order) {
-        order.at(filter_type) = new_order;
+    void set_order(const filter_type_t filter_type, const int new_order) {
+        orders[filter_type] = new_order;
     }
     vector<double> get_rms() {
         vector<double> result;
@@ -248,32 +270,32 @@ public:
         return result;
     }
 
-    void filter_init(filter_type_t filter_type)
+    void filter_init(const filter_type_t filter_type)
     {
         lock_guard<mutex> locker(audio_process);
         for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
             if (filter_type == HIGH_PASS)
             {
-                iir_coeff high_pass(order.at(filter_type), filter_type::high);
-                butterworth_iir(high_pass, _opt->get_int(L"pass_high_freq") / sample_rate, 3.0);
-                filter.at(channel).at(HIGH_PASS) = make_unique<iir<float_type, float_type>>(high_pass);
+                iir_coeff high_pass(orders[filter_type], filter_type::high);
+                butterworth_iir(high_pass, __opt->get_int(L"pass_high_freq") / sample_rate, 3.0);
+                filters[channel][HIGH_PASS] = make_unique<iir<float_type, float_type>>(high_pass);
             }
             if (filter_type == LOW_PASS)
             {
-                iir_coeff low_pass(order.at(filter_type), filter_type::low);
-                butterworth_iir(low_pass, _opt->get_int(L"pass_low_freq") / sample_rate, 3.0);
-                filter.at(channel).at(LOW_PASS) = make_unique<iir<float_type, float_type>>(low_pass);
+                iir_coeff low_pass(orders[filter_type], filter_type::low);
+                butterworth_iir(low_pass, __opt->get_int(L"pass_low_freq") / sample_rate, 3.0);
+                filters[channel][LOW_PASS] = make_unique<iir<float_type, float_type>>(low_pass);
             }
         }
     };
 
-    void prepare_to_play(double sample_rate_)
+    void prepare_to_play(const double sample_rate_)
     {
         sample_rate = sample_rate_;
 
         osc.set_sample_rate(sample_rate);
-        osc.set_freq(static_cast<float>(_opt->get_int(L"tone_value")));
+        osc.set_freq(static_cast<float>(__opt->get_int(L"tone_value")));
         osc.reset();
 
         filter_init(HIGH_PASS);
@@ -288,9 +310,9 @@ public:
             {
                 auto read          = buffer.buffer->getArrayOfReadPointers();
                 auto write         = buffer.buffer->getArrayOfWritePointers();
-                auto use_high_pass = _opt->get_int(L"pass_high") && filter.at(LEFT).at(HIGH_PASS) && filter.at(RIGHT).at(HIGH_PASS);
-                auto use_low_pass  = _opt->get_int(L"pass_low")  && filter.at(LEFT).at(LOW_PASS)  && filter.at(RIGHT).at(LOW_PASS);
-                auto use_tone      = _opt->get_int(L"tone"); // todo: ускорить работу в этой процедуре
+                auto use_high_pass = __opt->get_int(L"pass_high") && filters[LEFT][HIGH_PASS] && filters[RIGHT][HIGH_PASS];
+                auto use_low_pass  = __opt->get_int(L"pass_low" ) && filters[LEFT][LOW_PASS ] && filters[RIGHT][LOW_PASS ];
+                auto use_tone      = __opt->get_int(L"tone"); // todo: ускорить работу в этой процедуре
 
                 for (auto channel = LEFT; channel <= RIGHT; channel++)
                     for (auto sample_index = 0; sample_index < buffer.numSamples; ++sample_index)
@@ -299,8 +321,8 @@ public:
                         if (use_high_pass || use_low_pass || use_tone)
                         {
                             float_type sample = use_tone ? osc.sample(channel) : read[channel][sample_index];
-                            if (use_high_pass) sample = filter.at(channel).at(HIGH_PASS)->clock(sample);
-                            if (use_low_pass)  sample = filter.at(channel).at(LOW_PASS )->clock(sample);
+                            if (use_high_pass) sample = filters[channel][HIGH_PASS]->clock(sample);
+                            if (use_low_pass)  sample = filters[channel][LOW_PASS ]->clock(sample);
                             write[channel][sample_index] = static_cast<float>(sample);
                         }
                     }
@@ -313,12 +335,6 @@ public:
     }
 
 private:
-    double                                      sample_rate;
-    array<size_t, 2>                            order;                                 // [HIGH_PASS>LOW_PASS]
-    mutex                                       audio_process;
-    sin_                                        osc;
-    unique_ptr<circle_>                         buff;
-    array<double, 2>                            zero;                                  // [LEFT>RIGHT        ]
-    array<array<double, STAT_SIZE>, LEVEL_SIZE> minmax;                                // [LEFT>RIGHT>BALANCE][MIN>MAX]
-    array<array<unique_ptr<iir<float_type, float_type>>, FILTER_TYPE_SIZE>, 2> filter; // [LEFT>RIGHT        ][HIGH_PASS>LOW_PASS]
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(signal_)
+
 };

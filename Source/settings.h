@@ -35,6 +35,25 @@ protected:
         { { },                   { L"pass_low_order",     L"120"   } },
     };
 
+private:
+    // поиск как по ключам, так и по строкам конфига
+    const option_t* get_option(const String& request) {
+        auto find_key = options.find(request);
+
+        if (find_key != options.end() && find_key->first.isNotEmpty())
+            return &find_key->second;
+
+        auto find = find_if(options.begin(), options.end(),
+            [request](const auto& obj) { return obj.second.xml_name == request; });
+
+        if (find != options.end())
+            return &find->second;
+
+        return { };
+    }
+
+    ApplicationProperties settings;
+
 public:
     settings_()
     {
@@ -78,21 +97,6 @@ public:
     }
 
 private:
-    // поиск как по ключам, так и по строкам конфига
-    const option_t* get_option(const String& request) {
-        auto find_key = options.find(request);
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(settings_)
 
-        if (find_key != options.end() && find_key->first.isNotEmpty())
-            return &find_key->second;
-
-        auto find = find_if(options.begin(), options.end(),
-            [request](const auto& obj) { return obj.second.xml_name == request; });
-
-        if (find != options.end())
-            return &find->second;
-
-        return { };
-    }
-
-    ApplicationProperties settings;
 };

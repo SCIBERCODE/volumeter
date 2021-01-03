@@ -16,11 +16,11 @@
             file="Source/gui_calibration.h"/>
       <FILE id="dZq3WU" name="gui_filter.h" compile="0" resource="0" file="Source/gui_filter.h"/>
       <FILE id="cavXJe" name="gui_graph.h" compile="0" resource="0" file="Source/gui_graph.h"/>
+      <FILE id="owFCqK" name="gui_theme.h" compile="0" resource="0" file="Source/gui_theme.h"/>
       <FILE id="FOprC1" name="main.cpp" compile="1" resource="0" file="Source/main.cpp"/>
       <FILE id="GuKL11" name="main.h" compile="0" resource="0" file="Source/main.h"/>
       <FILE id="wPVTwc" name="settings.h" compile="0" resource="0" file="Source/settings.h"/>
       <FILE id="xcce8E" name="signal.h" compile="0" resource="0" file="Source/signal.h"/>
-      <FILE id="owFCqK" name="theme.h" compile="0" resource="0" file="Source/theme.h"/>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_ASIO="1"/>

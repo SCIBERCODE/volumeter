@@ -1,10 +1,10 @@
 ﻿#pragma once
 #include <JuceHeader.h>
 #include <memory>
-#include "theme.h"
+#include "gui_theme.h"
 #include "settings.h"
 
-extern unique_ptr<theme::light_> _theme;
+extern unique_ptr<theme::light_> __theme;
 
 const map<int, String> _prefs = {
     { -15, L"f" },
@@ -17,23 +17,23 @@ const map<int, String> _prefs = {
     {   6, L"M" }
 };
 
-enum level_t : size_t {
+enum volume_t : size_t {
     LEFT = 0,
     RIGHT,
     BALANCE,
-    LEVEL_SIZE
+    VOLUME_SIZE
 };
 
-const map<level_t, String> _stat_captions = {
+const map<volume_t, String> _stat_captions = {
     { LEFT,    L"Left"    },
     { RIGHT,   L"Right"   },
     { BALANCE, L"Balance" }
 };
 
-enum stat_t : size_t {
+enum extremum_t : size_t {
     MIN = 0,
     MAX,
-    STAT_SIZE
+    EXTREMES_SIZE
 };
 
 enum filter_type_t : size_t {
@@ -45,7 +45,7 @@ enum filter_type_t : size_t {
 enum labels_stat_column_t : size_t {
     LABEL = 0,
     VALUE,
-    MINMAX,
+    EXTREMES,
     LABELS_STAT_COLUMN_SIZE
 };
 
@@ -55,7 +55,7 @@ void operator ++(T& value, int)
     value = static_cast<T>(value + 1);
 }
 
-String prefix(double value, String unit, size_t numder_of_decimals);
+String prefix(double value, const wchar_t *unit, size_t numder_of_decimals);
 String prefix_v(double value);
 
 bool is_about_equal(float a, float b);
@@ -70,9 +70,9 @@ public:
 
     const String getApplicationName() override;
     const String getApplicationVersion() override;
-    void shutdown() override;
-    void initialise(const String&) override;
-    bool moreThanOneInstanceAllowed() override;
+    void  shutdown() override;
+    void  initialise(const String&) override;
+    bool  moreThanOneInstanceAllowed() override;
 
 protected:
 
@@ -80,7 +80,7 @@ protected:
     {
     public:
         main_window_ (const String& name, Component* component, JUCEApplication& a) :
-            DocumentWindow(name, _theme->get_bg_color(), DocumentWindow::allButtons),
+            DocumentWindow(name, __theme->get_bg_color(), DocumentWindow::allButtons),
             app(a)
         {
             setUsingNativeTitleBar(false);
@@ -100,6 +100,7 @@ protected:
     private:
         JUCEApplication& app;
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_window_)
+
     };
 
 private:

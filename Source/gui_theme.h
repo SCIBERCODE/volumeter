@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <JuceHeader.h>
 
 #define _USE_MATH_DEFINES
@@ -13,12 +13,12 @@ namespace theme
     const size_t margin       = 5;
     const size_t label_width  = 80;
     const size_t button_width = 100;
-    const auto   graph_indent = 15.0f;
+    const size_t graph_indent = 15;
     const auto   empty        = L"--";
     const auto   font_height  = 15.0f;
 
-    auto grey_level(uint8_t level) {
-        return Colour::greyLevel(jmap(static_cast<float>(level), 0.0f, 256.0f, 0.0f, 1.0f));
+    auto grey_level(const float level) {
+        return Colour::greyLevel(jmap(level, 0.0f, 256.0f, 0.0f, 1.0f));
     }
 
     class light_ : public LookAndFeel_V4 {
@@ -139,6 +139,10 @@ namespace theme
 
             g.strokePath(p, PathStrokeType(1.0f));
         }
+
+    private:
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(light_)
+
     };
 
     //=========================================================================================
