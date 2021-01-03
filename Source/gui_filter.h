@@ -4,7 +4,9 @@
 
 extern unique_ptr<settings_> _opt;
 
-class filter_component_ : public Component
+// bug: самовозбуд стейнберга при выкрученной громкости на lpf 15000
+
+class component_filter_ : public Component
 {
 protected:
     const vector<int> order_list = { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
@@ -16,8 +18,8 @@ protected:
 
 public:
 
-    filter_component_(signal_& signal) : signal(signal)
-    // todo: filter_component_(shared_ptr<signal_> signal) : signal(move(signal))
+    component_filter_(signal_& signal) : signal(signal)
+    // todo: component_filter_(shared_ptr<signal_> signal) : signal(move(signal))
     {
         addAndMakeVisible(group);
         addAndMakeVisible(label_filter);
@@ -92,7 +94,7 @@ public:
         }
     }
 
-    ~filter_component_() { }
+    ~component_filter_() { }
 
     void resized() override
     {
@@ -130,10 +132,10 @@ public:
     }
 
 private:
-    signal_                 & signal;
-    theme::checkbox_right_lf_ theme_right;
-    Label                     label_filter { { }, L"Filter(s)" };
-    GroupComponent            group;
+    signal_                   & signal;
+    theme::checkbox_right_tick_ theme_right;
+    Label                       label_filter { { }, L"Filter(s)" };
+    GroupComponent              group;
 
     array<unique_ptr<ToggleButton>, FILTER_TYPE_SIZE> checkbox_type;
     array<unique_ptr<Label>,        FILTER_TYPE_SIZE> label_desc;

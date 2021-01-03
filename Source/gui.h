@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "gui_filter.h"
 #include "gui_calibration.h"
+#include "gui_graph.h"
 
 extern unique_ptr<settings_> _opt;
 
@@ -17,10 +18,9 @@ protected:
 public:
 //=========================================================================================
     main_component_() :
-        calibrations_component(signal),
-        filter_component      (signal)
+        component_calibration(signal),
+        component_filter     (signal)
     {
-        clear_graph();
         load_devices();
 
         // === middle settings ============================================================
@@ -129,12 +129,13 @@ public:
         button_stat_reset.onClick = [this]
         {
             signal.minmax_clear();
-            clear_graph();
+            component_graph.reset();
         };
 
-        addAndMakeVisible(filter_component);
-        addAndMakeVisible(calibrations_component);
-        calibrations_component.update();
+        addAndMakeVisible(component_graph);
+        addAndMakeVisible(component_filter);
+        addAndMakeVisible(component_calibration);
+        component_calibration.update();
 
         setSize(430, 790);
         startTimer(100);
@@ -149,13 +150,6 @@ public:
         checkbox_tone.setLookAndFeel(nullptr);
         for (auto line = LEFT; line < LEVEL_SIZE; line++)
             check_stat.at(line)->setLookAndFeel(nullptr);
-    }
-
-    void clear_graph() {
-        auto display_width = 0;
-        for (auto display : Desktop::getInstance().getDisplays().displays)
-            display_width += display.userArea.getWidth();
-        history_stat = make_unique<circle_>(display_width);
     }
 
     //=====================================================================================
@@ -249,7 +243,7 @@ public:
     {
         combo_buff_size.onChange();
         signal.prepare_to_play(sample_rate);
-        filter_component.prepare_to_play(sample_rate);
+        component_filter.prepare_to_play(sample_rate);
     }
 
     void getNextAudioBlock(const AudioSourceChannelInfo& buffer) override
@@ -289,9 +283,9 @@ public:
         {
             area.removeFromBottom(theme::margin);
             // фильтр
-            filter_component.setBounds(area.removeFromBottom(95));
+            component_filter.setBounds(area.removeFromBottom(95));
             area.removeFromBottom(theme::margin);
-            calibrations_component.setBounds(area.removeFromBottom(250));
+            component_calibration.setBounds(area.removeFromBottom(250));
 
             // stat
             area.removeFromBottom(theme::margin * 2);
@@ -323,7 +317,7 @@ public:
             }
             remain.removeFromTop(theme::margin);
             remain.removeFromBottom(theme::margin);
-            history_plot = remain;
+            component_graph.setBounds(remain);
         }
     }
 
@@ -334,11 +328,11 @@ public:
 
         function<String(double)> print;
 
-        auto calibrate = calibrations_component.is_active();
+        auto calibrate = component_calibration.is_active();
         if (calibrate)
         {
-            rms.at(LEFT)  *= calibrations_component.get_coeff(LEFT); // bug: при неучтённом префиксе
-            rms.at(RIGHT) *= calibrations_component.get_coeff(RIGHT);
+            rms.at(LEFT)  *= component_calibration.get_coeff(LEFT); // bug: при неучтённом префиксе
+            rms.at(RIGHT) *= component_calibration.get_coeff(RIGHT);
             print = prefix_v;
         }
         else {
@@ -348,14 +342,7 @@ public:
         }
         rms.push_back(abs(rms.at(LEFT) - rms.at(RIGHT)));
         signal.minmax_set(rms);
-
-        if (!button_pause_graph.getToggleState()) {
-            if (isfinite(rms.at(LEFT))) { // todo: syncrochannels
-                history_stat->enqueue(LEFT,  static_cast<float>(rms.at(LEFT)));
-                history_stat->enqueue(RIGHT, static_cast<float>(rms.at(RIGHT)));
-                repaint(); // todo: оптимизировать
-            }
-        }
+        component_graph.enqueue(rms);
 
         array<String, 3> printed;
         for (auto line = LEFT; line < LEVEL_SIZE; line++)
@@ -378,125 +365,6 @@ public:
         }
     }
 
-    bool is_about_equal(float a, float b) {
-        return fabs(a - b) <= ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * (FLT_EPSILON / 10000));
-    }
-
-    bool round_flt(float value) {
-        return round(value * 10000.0f) / 10000.0f;
-    }
-
-    void paint(Graphics& g) override
-    {
-        g.setColour(Colours::white);
-        g.fillRect(history_plot);
-
-        const float dotted_pattern[2] = { 2.0f, 3.0f };
-        auto y_start = history_plot.getY() + theme::graph_indent;
-        auto y_end   = history_plot.getY() + history_plot.getHeight() - theme::graph_indent;
-
-        g.setColour(Colours::grey);
-        g.drawDashedLine(
-            Line<float>(static_cast<float>(history_plot.getX()), y_start, static_cast<float>(history_plot.getRight()), y_start),
-            dotted_pattern, _countof(dotted_pattern)
-        );
-        g.drawDashedLine(
-            Line<float>(static_cast<float>(history_plot.getX()), y_end, static_cast<float>(history_plot.getRight()), y_end),
-            dotted_pattern, _countof(dotted_pattern)
-        );
-
-        for (auto channel = LEFT; channel <= RIGHT; channel++)
-        {
-            if (channel == LEFT  && _opt->get_int(L"graph_left" ) == 0) continue;
-            if (channel == RIGHT && _opt->get_int(L"graph_right") == 0) continue;
-
-            auto  minmax = history_stat->get_minmax(channel, history_plot.getWidth());
-            float offset = 0.0f;
-            float value;
-            //=====================================================================================
-            if (history_stat->get_first_value(channel, history_plot.getWidth(), value)) // bug: устранить мерцание при заполнении буфера
-            {
-                Path path;
-                do {
-                    if (!isfinite(value)) break;
-                    auto x = history_plot.getRight() - offset++;
-                    auto y = -value * (history_plot.getHeight() / abs(minmax.at(MIN) - minmax.at(MAX)));
-                    if (path.isEmpty())
-                        path.startNewSubPath(x, y);
-
-                    path.lineTo(x, y);
-                } while (history_stat->get_next_value(value));
-                if (offset < 2) return;
-
-                path.scaleToFit(
-                    history_plot.getX() + (history_plot.getWidth() - offset),
-                    y_start,
-                    offset,
-                    history_plot.getHeight() - theme::graph_indent * 2,
-                    false
-                );
-                g.setColour(channel == LEFT ? Colours::black : Colours::green);
-                g.strokePath(path, PathStrokeType(1.0f));
-            }
-            //=====================================================================================
-            offset = 0.0f;
-            if (history_stat->get_first_value(channel, history_plot.getWidth(), value))
-                do {
-                    for (auto stat = MIN; stat < STAT_SIZE; stat++)
-                    {
-                        //if (round_flt(value) == round_flt(minmax.at(MAX)))
-                        //if (is_about_equal(value, minmax.at(MAX)))
-                        if (String(value, 3) == String(minmax.at(stat), 3))
-                        {
-                            const auto text = String(value, 3) + L" dB";
-                            const auto text_width = g.getCurrentFont().getStringWidth(text);
-                            Rectangle<int> rect =
-                            {
-                                static_cast<int>(history_plot.getRight() - offset - (text_width / 2)),
-                                static_cast<int>(stat == MAX ? y_start - 14 : y_end + 1),
-                                text_width,
-                                13
-                            };
-                            int overhung[2] = {
-                                rect.getX() - history_plot.getX(),
-                                history_plot.getRight() - rect.getRight(),
-                            };
-                            if (overhung[0] < 0) rect.setCentre(rect.getCentreX() - overhung[0], rect.getCentreY());
-                            if (overhung[1] < 0) rect.setCentre(rect.getCentreX() + overhung[1], rect.getCentreY());
-
-                            g.setColour(Colours::white);
-                            if (stat == MAX) g.fillRect(history_plot.withBottom(y_start - 1));
-                            if (stat == MIN) g.fillRect(history_plot.withTop(y_end + 1));
-
-                            g.setColour(channel == LEFT ? Colours::black : Colours::green);
-                            g.drawText(text, rect, Justification::centred, false);
-                            break;
-                        }
-                    }
-                    offset++;
-                } while (history_stat->get_next_value(value));
-        }
-        /*const size_t line_width = 30;
-        Rectangle<int> rect
-        (
-            history_plot.getX(),
-            static_cast<int>(y_end),
-            history_plot.getWidth() - theme::margin,
-            13
-        );
-        for (auto channel = LEFT; channel <= RIGHT; channel++)
-        {
-            const auto text = _stat_captions.at(channel);
-            const auto text_width = g.getCurrentFont().getStringWidth(text);
-            g.setColour(channel == LEFT ? Colours::black : Colours::green);
-            g.drawFittedText(text, rect.removeFromRight(text_width + theme::margin), Justification::centredRight, 1);
-            g.fillRect(rect.removeFromRight(line_width).withY(rect.getY() + 1).reduced(0, 6));
-            rect.removeFromRight(theme::margin);
-        }
-        g.setColour(Colours::grey);
-        g.drawRect(history_plot);*/
-    }
-
 //=========================================================================================
 private:
 //=========================================================================================
@@ -504,11 +372,12 @@ private:
     array<unique_ptr<ToggleButton>, LEVEL_SIZE>    check_stat;  // [LEFT>RIGHT>BALANCE]
     array<array<unique_ptr<Label>, 2>, LEVEL_SIZE> label_stat;  // [LEFT>RIGHT>BALANCE][VALUE>MINMAX]
     array<array<Rectangle<int>, 2>, 2>             rect_minmax;
-    unique_ptr<circle_>                            history_stat;
-    signal_                                        signal;
-    calibrations_component_                        calibrations_component;
-    filter_component_                              filter_component;
-    Rectangle<int>                                 history_plot;
+
+    signal_                    signal;
+    component_calibration_     component_calibration;
+    component_filter_          component_filter;
+    component_graph_           component_graph;
+    theme::checkbox_left_tick_ theme_right_text;
 
     Label         label_device_type  { {}, L"Type"        },
                   label_device       { {}, L"Device"      },
@@ -516,10 +385,8 @@ private:
                   label_buff_size    { {}, L"Buff size"   };
     ToggleButton  checkbox_tone      {     L"Tone"        };
     TooltipWindow hint               { this               };
-
-    TextButton                     button_zero, button_stat_reset, button_pause_graph;
-    ComboBox                       combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
-    theme::checkbox_right_text_lf_ theme_right_text;
+    TextButton    button_zero, button_stat_reset, button_pause_graph;
+    ComboBox      combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_component_)
 };

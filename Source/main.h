@@ -58,6 +58,9 @@ void operator ++(T& value, int)
 String prefix(double value, String unit, size_t numder_of_decimals);
 String prefix_v(double value);
 
+bool is_about_equal(float a, float b);
+bool round_flt(float value);
+
 //=========================================================================================
 class application_ : public JUCEApplication
 {

@@ -52,4 +52,12 @@ String prefix_v(double value) {
     return prefix(value, L"V", 5);
 }
 
+bool is_about_equal(float a, float b) {
+    return fabs(a - b) <= ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * FLT_EPSILON);
+}
+
+bool round_flt(float value) {
+    return round(value * 10000.0f) / 10000.0f;
+}
+
 START_JUCE_APPLICATION(application_)

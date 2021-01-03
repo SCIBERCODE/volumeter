@@ -1,16 +1,16 @@
-﻿#pragma once
+#pragma once
 #include <JuceHeader.h>
 #include "signal.h"
 
 extern unique_ptr<settings_>     _opt;
 extern unique_ptr<theme::light_> _theme;
 
-class calibrations_component_ : public Component,
+class component_calibration_ : public Component,
                                 public TableListBoxModel
 {
 public:
 
-    calibrations_component_(signal_& _signal) : signal(_signal)
+    component_calibration_(signal_& _signal) : signal(_signal)
     {
         addAndMakeVisible(group);
         addAndMakeVisible(checkbox_cal);
@@ -284,7 +284,7 @@ protected:
     class _table_custom_button : public Component
     {
     public:
-        _table_custom_button(calibrations_component_& td) : owner(td)
+        _table_custom_button(component_calibration_& td) : owner(td)
         {
             addAndMakeVisible(button);
             button.setButtonText(L"X");
@@ -302,9 +302,9 @@ protected:
         }
 
     private:
-        calibrations_component_& owner;
-        TextButton               button;
-        int                      row;
+        component_calibration_& owner;
+        TextButton              button;
+        int                     row;
     };
 
 //=========================================================================================
@@ -333,5 +333,5 @@ private:
         return {};
     }
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(calibrations_component_)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(component_calibration_)
 };
