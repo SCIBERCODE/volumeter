@@ -80,9 +80,9 @@ public:
                 {
                     auto checkbox = make_unique<ToggleButton>();
                     addAndMakeVisible(checkbox.get());
-                    checkbox->setButtonText(_stat_captions.at(line));
+                    checkbox->setButtonText(__stat_captions.at(line));
                     checkbox->setLookAndFeel(&theme_right_text);
-                    if (line != BALANCE) checkbox->setTooltip("Show " + _stat_captions.at(line).toLowerCase() + " channel on the graph");
+                    if (line != BALANCE) checkbox->setTooltip(L"Show " + __stat_captions.at(line).toLowerCase() + L" channel on the graph");
                     switch (line) {
                     case LEFT   : checkbox->setToggleState(__opt->get_int    (L"graph_left"),  dontSendNotification);
                                   checkbox->onClick = [&, line] { __opt->save(L"graph_left", check_stat[line]->getToggleState()); }; break;

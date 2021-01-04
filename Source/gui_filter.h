@@ -1,8 +1,9 @@
-#pragma once
+﻿#pragma once
 #include <JuceHeader.h>
 #include "signal.h"
 
-extern unique_ptr<settings_> __opt;
+extern unique_ptr<settings_>     __opt;
+extern unique_ptr<theme::light_> __theme;
 
 // bug: самовозбуд стейнберга при выкрученной громкости на lpf 15000
 
@@ -18,8 +19,7 @@ protected:
 private:
     signal_                   & signal;
     theme::checkbox_right_tick_ theme_right;
-    Label                       label_filter { { }, L"Filter(s)" };
-    GroupComponent              group;
+    GroupComponent              group { { }, L"Filter(s)" };
     unique_ptr<ToggleButton>    checkbox_type[FILTER_TYPE_SIZE];
     unique_ptr<Label>           label_desc   [FILTER_TYPE_SIZE];
     unique_ptr<TextEditor>      edit_freq    [FILTER_TYPE_SIZE];
@@ -31,8 +31,6 @@ public:
     // todo: component_filter_(shared_ptr<signal_> signal) : signal(move(signal))
     {
         addAndMakeVisible(group);
-        addAndMakeVisible(label_filter);
-        label_filter.setColour(Label::backgroundColourId, __theme->get_bg_color());
 
         for (auto type = HIGH_PASS; type < FILTER_TYPE_SIZE; type++)
         {
@@ -121,7 +119,6 @@ public:
             area.removeFromTop(theme::margin);
         }
         group.setBounds(getLocalBounds());
-        __theme->set_header_label_bounds(label_filter);
     }
 
     void prepare_to_play(const double sample_rate)

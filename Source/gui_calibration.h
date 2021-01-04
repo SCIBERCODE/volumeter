@@ -86,7 +86,7 @@ public:
         label_cal_add.attachToComponent(&editor_cal_name, true);
         label_cal_channels.attachToComponent(&editor_cal_channels[LEFT], true);
         editor_cal_name.setTextToShowWhenEmpty(L"Calibration name (optional)", Colours::grey);
-        for (auto const& pref : _prefs)
+        for (auto const& pref : __prefs)
             combo_prefix.addItem(pref.second + L"V", pref.first + 1);
 
         combo_prefix.setSelectedId(__opt->get_int(L"combo_prefix") + 1);
@@ -245,12 +245,11 @@ public:
         {
             auto* button = static_cast<table_custom_button_*>(component);
             if (button == nullptr)
-                button = new table_custom_button_(*this);
+                button = make_unique<table_custom_button_>(*this).release();
 
             button->set_row(row);
             return button;
         }
-        jassert(component == nullptr);
         return nullptr;
     }
 

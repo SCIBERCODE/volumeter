@@ -3,6 +3,7 @@
 using namespace std;
 
 #include "main.h"
+#include "gui_theme.h"
 #include "gui.h"
 
 unique_ptr<settings_>     __opt;
@@ -18,16 +19,32 @@ application_::~application_() {
     __theme.reset();
 }
 
-const String application_::getApplicationName()    { return L"rms_volumeter"; }
-const String application_::getApplicationVersion() { return __DATE__;         }
-void  application_::shutdown()                     { main_window = nullptr;   }
-bool  application_::moreThanOneInstanceAllowed()   { return true;             }
+application_::main_window_::main_window_(const String& name, JUCEApplication& app) :
+    DocumentWindow(name, __theme->get_bg_color(), DocumentWindow::allButtons),
+    _app(app)
+{
+    _content = make_unique<main_component_>();
+
+    setUsingNativeTitleBar(false);
+    setTitleBarTextCentred(true);
+    setResizable(true, false);
+    setContentOwned(_content.get(), true);
+    centreWithSize(getWidth(), getHeight());
+    setVisible(true);
+    toFront(true);
+}
 
 void application_::initialise(const String&)
 {
     Desktop::getInstance().setDefaultLookAndFeel(__theme.get());
-    main_window = make_unique<main_window_>(L"rms volumeter", new main_component_(), *this);
+    _main_window = make_unique<main_window_>(L"rms volumeter", *this);
 }
+
+const String application_::getApplicationName()        { return L"rms_volumeter";    }
+const String application_::getApplicationVersion()     { return __DATE__;            }
+bool  application_::moreThanOneInstanceAllowed()       { return true;                }
+void  application_::shutdown()                         { _main_window = nullptr;     }
+void  application_::main_window_::closeButtonPressed() { _app.systemRequestedQuit(); }
 
 String prefix(const double value, const wchar_t *unit, const size_t numder_of_decimals)
 {
@@ -35,9 +52,9 @@ String prefix(const double value, const wchar_t *unit, const size_t numder_of_de
     double new_value = value;
 
     auto exp = static_cast<int>(floor(log10(value) / 3.0) * 3.0);
-    if (_prefs.count(exp))
+    if (__prefs.count(exp))
     {
-        symbol = _prefs.at(exp);
+        symbol = __prefs.at(exp);
         new_value = value * pow(10.0, -exp);
         if (new_value >= 1000.0)
         {

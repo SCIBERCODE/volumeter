@@ -19,22 +19,18 @@ public:
     {
         reset();
     }
-
     void set_sample_rate(const double sample_rate) {
         sampling_rate = sample_rate;
     }
-
     void reset() {
         for (auto& angle : angles)
             angle = 0.0;
     }
-
     void set_freq(const float frequency) {
         freq = frequency;
         auto cycles_per_sample = frequency / sampling_rate;
         angle_delta = cycles_per_sample * 2.0 * M_PI;
     }
-
     auto sample(const volume_t channel) {
         auto current_sample = sin(angles[channel]);
         angles[channel] += angle_delta;
@@ -174,22 +170,22 @@ class signal_
 //=========================================================================================
 {
 private:
-    double              sample_rate;
-    mutex               audio_process;
-    sin_                osc;
-    unique_ptr<circle_> buff;
+    double              _sample_rate;
+    mutex               _locker;
+    sin_                _sin;
+    unique_ptr<circle_> _buff;
     unique_ptr<iir<float_type, float_type>>
-                        filters [VOLUME_SIZE][FILTER_TYPE_SIZE];
-    size_t              orders               [FILTER_TYPE_SIZE];
-    double              extremes[VOLUME_SIZE][EXTREMES_SIZE];
-    double              zeros   [VOLUME_SIZE];
+                        _filters [VOLUME_SIZE][FILTER_TYPE_SIZE];
+    size_t              _orders               [FILTER_TYPE_SIZE];
+    double              _extremes[VOLUME_SIZE][EXTREMES_SIZE];
+    double              _zeros   [VOLUME_SIZE];
 public:
 
     signal_()
     {
-        sample_rate       = __opt->get_int(L"sample_rate"    );
-        orders[HIGH_PASS] = __opt->get_int(L"pass_high_order");
-        orders[LOW_PASS ] = __opt->get_int(L"pass_low_order" );
+        _sample_rate       = __opt->get_int(L"sample_rate"    );
+        _orders[HIGH_PASS] = __opt->get_int(L"pass_high_order");
+        _orders[LOW_PASS ] = __opt->get_int(L"pass_low_order" );
 
         zero_clear();
     }
@@ -198,24 +194,24 @@ public:
         double value_left  = numeric_limits<float>::quiet_NaN(),
         double value_right = numeric_limits<float>::quiet_NaN())
     {
-        lock_guard<mutex> locker(audio_process);
+        lock_guard<mutex> locker(_locker);
         if (isfinite(value_left) && isfinite(value_right)) {
-            zeros[LEFT ] = value_left;
-            zeros[RIGHT] = value_right;
+            _zeros[LEFT ] = value_left;
+            _zeros[RIGHT] = value_right;
         }
         else {
-            zeros[LEFT ] = gain2db(buff->get_rms(LEFT ));
-            zeros[RIGHT] = gain2db(buff->get_rms(RIGHT));
-            __opt->save(L"zero_value_left" , zeros[LEFT ]);
-            __opt->save(L"zero_value_right", zeros[RIGHT]);
+            _zeros[LEFT ] = gain2db(_buff->get_rms(LEFT ));
+            _zeros[RIGHT] = gain2db(_buff->get_rms(RIGHT));
+            __opt->save(L"zero_value_left" , _zeros[LEFT ]);
+            __opt->save(L"zero_value_right", _zeros[RIGHT]);
         }
         extremes_clear();
     }
     auto zero_get(const volume_t channel) {
-        return zeros[channel];
+        return _zeros[channel];
     }
     void zero_clear() {
-        for (auto& zero : zeros) zero = 0.0;
+        for (auto& zero : _zeros) zero = 0.0;
         extremes_clear();
     }
 
@@ -223,17 +219,17 @@ public:
         for (auto line = LEFT; line < VOLUME_SIZE; line++) // bug: на вольтах при переключении нижняя граница не похожа на правду
             if (isfinite(rms.at(line)))
             {
-                if (!isfinite(extremes[line][MIN])) extremes[line][MIN] = rms.at(line);
-                if (!isfinite(extremes[line][MAX])) extremes[line][MAX] = rms.at(line);
-                extremes[line][MIN] = min(extremes[line][MIN], rms.at(line));
-                extremes[line][MAX] = max(extremes[line][MAX], rms.at(line));
+                if (!isfinite(_extremes[line][MIN])) _extremes[line][MIN] = rms.at(line);
+                if (!isfinite(_extremes[line][MAX])) _extremes[line][MAX] = rms.at(line);
+                _extremes[line][MIN] = min(_extremes[line][MIN], rms.at(line));
+                _extremes[line][MAX] = max(_extremes[line][MAX], rms.at(line));
             }
     }
     const auto extremes_get(const volume_t channel) {
-        return extremes[channel];
+        return _extremes[channel];
     }
     void extremes_clear() {
-        for (auto& line : extremes)
+        for (auto& line : _extremes)
             for (auto& column : line)
                 column = numeric_limits<float>::quiet_NaN();
     }
@@ -242,61 +238,61 @@ public:
         return 20 * log10(gain);
     }
     void set_freq(const double freq) {
-        osc.set_freq(static_cast<float>(freq));
-        osc.reset();
+        _sin.set_freq(static_cast<float>(freq));
+        _sin.reset();
     }
     void change_buff_size(const int new_size) {
-        lock_guard<mutex> locker(audio_process);
-        if (new_size && sample_rate) {
-            auto number_of_samples = static_cast<size_t>(new_size / (1000.0 / sample_rate));
-            buff = make_unique<circle_>(number_of_samples);
+        lock_guard<mutex> locker(_locker);
+        if (new_size && _sample_rate) {
+            auto number_of_samples = static_cast<size_t>(new_size / (1000.0 / _sample_rate));
+            _buff = make_unique<circle_>(number_of_samples);
         }
     }
     void clear_data() {
-        lock_guard<mutex> locker(audio_process);
-        if (buff)
-            buff->clear();
+        lock_guard<mutex> locker(_locker);
+        if (_buff)
+            _buff->clear();
     }
     void set_order(const filter_type_t filter_type, const int new_order) {
-        orders[filter_type] = new_order;
+        _orders[filter_type] = new_order;
     }
     vector<double> get_rms() {
         vector<double> result;
-        if (buff)
+        if (_buff)
         {
-            result.push_back(buff->get_rms(LEFT));
-            result.push_back(buff->get_rms(RIGHT));
+            result.push_back(_buff->get_rms(LEFT));
+            result.push_back(_buff->get_rms(RIGHT));
         };
         return result;
     }
 
     void filter_init(const filter_type_t filter_type)
     {
-        lock_guard<mutex> locker(audio_process);
+        lock_guard<mutex> locker(_locker);
         for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
             if (filter_type == HIGH_PASS)
             {
-                iir_coeff high_pass(orders[filter_type], filter_type::high);
-                butterworth_iir(high_pass, __opt->get_int(L"pass_high_freq") / sample_rate, 3.0);
-                filters[channel][HIGH_PASS] = make_unique<iir<float_type, float_type>>(high_pass);
+                iir_coeff high_pass(_orders[filter_type], filter_type::high);
+                butterworth_iir(high_pass, __opt->get_int(L"pass_high_freq") / _sample_rate, 3.0);
+                _filters[channel][HIGH_PASS] = make_unique<iir<float_type, float_type>>(high_pass);
             }
             if (filter_type == LOW_PASS)
             {
-                iir_coeff low_pass(orders[filter_type], filter_type::low);
-                butterworth_iir(low_pass, __opt->get_int(L"pass_low_freq") / sample_rate, 3.0);
-                filters[channel][LOW_PASS] = make_unique<iir<float_type, float_type>>(low_pass);
+                iir_coeff low_pass(_orders[filter_type], filter_type::low);
+                butterworth_iir(low_pass, __opt->get_int(L"pass_low_freq") / _sample_rate, 3.0);
+                _filters[channel][LOW_PASS] = make_unique<iir<float_type, float_type>>(low_pass);
             }
         }
     };
 
-    void prepare_to_play(const double sample_rate_)
+    void prepare_to_play(const double sample_rate)
     {
-        sample_rate = sample_rate_;
+        _sample_rate = sample_rate;
 
-        osc.set_sample_rate(sample_rate);
-        osc.set_freq(static_cast<float>(__opt->get_int(L"tone_value")));
-        osc.reset();
+        _sin.set_sample_rate(_sample_rate);
+        _sin.set_freq(static_cast<float>(__opt->get_int(L"tone_value")));
+        _sin.reset();
 
         filter_init(HIGH_PASS);
         filter_init(LOW_PASS);
@@ -304,25 +300,25 @@ public:
 
     void next_audio_block(const AudioSourceChannelInfo& buffer)
     {
-        if (audio_process.try_lock()) // todo: битый буфер не норм, сигнализировать, что не тянет проц текущих настроек
+        if (_locker.try_lock()) // todo: битый буфер не норм, сигнализировать, что не тянет проц текущих настроек
         {
-            if (buff)
+            if (_buff)
             {
                 auto read          = buffer.buffer->getArrayOfReadPointers();
                 auto write         = buffer.buffer->getArrayOfWritePointers();
-                auto use_high_pass = __opt->get_int(L"pass_high") && filters[LEFT][HIGH_PASS] && filters[RIGHT][HIGH_PASS];
-                auto use_low_pass  = __opt->get_int(L"pass_low" ) && filters[LEFT][LOW_PASS ] && filters[RIGHT][LOW_PASS ];
+                auto use_high_pass = __opt->get_int(L"pass_high") && _filters[LEFT][HIGH_PASS] && _filters[RIGHT][HIGH_PASS];
+                auto use_low_pass  = __opt->get_int(L"pass_low" ) && _filters[LEFT][LOW_PASS ] && _filters[RIGHT][LOW_PASS ];
                 auto use_tone      = __opt->get_int(L"tone"); // todo: ускорить работу в этой процедуре
 
                 for (auto channel = LEFT; channel <= RIGHT; channel++)
                     for (auto sample_index = 0; sample_index < buffer.numSamples; ++sample_index)
                     {
-                        buff->enqueue(channel, read[channel][sample_index] * read[channel][sample_index]);
+                        _buff->enqueue(channel, read[channel][sample_index] * read[channel][sample_index]);
                         if (use_high_pass || use_low_pass || use_tone)
                         {
-                            float_type sample = use_tone ? osc.sample(channel) : read[channel][sample_index];
-                            if (use_high_pass) sample = filters[channel][HIGH_PASS]->clock(sample);
-                            if (use_low_pass)  sample = filters[channel][LOW_PASS ]->clock(sample);
+                            float_type sample = use_tone ? _sin.sample(channel) : read[channel][sample_index];
+                            if (use_high_pass) sample = _filters[channel][HIGH_PASS]->clock(sample);
+                            if (use_low_pass)  sample = _filters[channel][LOW_PASS ]->clock(sample);
                             write[channel][sample_index] = static_cast<float>(sample);
                         }
                     }
@@ -330,7 +326,7 @@ public:
                 if (!use_high_pass && !use_low_pass && !use_tone)
                     buffer.clearActiveBufferRegion();
             }
-            audio_process.unlock();
+            _locker.unlock();
         }
     }
 

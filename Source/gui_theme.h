@@ -1,14 +1,8 @@
-#pragma once
+﻿#pragma once
 #include <JuceHeader.h>
-
-#define _USE_MATH_DEFINES
-#include <math.h>
 
 namespace theme
 {
-    const auto MF_PI   = static_cast<float>(M_PI);
-    const auto MF_PI_2 = static_cast<float>(M_PI_2);
-
     const size_t height       = 20;
     const size_t margin       = 5;
     const size_t label_width  = 80;
@@ -17,7 +11,7 @@ namespace theme
     const auto   empty        = L"--";
     const auto   font_height  = 15.0f;
 
-    auto grey_level(const float level) {
+    static auto grey_level(const float level) {
         return Colour::greyLevel(jmap(level, 0.0f, 256.0f, 0.0f, 1.0f));
     }
 
@@ -59,30 +53,16 @@ namespace theme
             return label_component.getFont().withHeight(14.0f);
         }
 
-        float _tick_width = 0.0f;
-        float _y = 0.0f;
-
         void set_header_checkbox_bounds(ToggleButton& button) {
             Font font(font_height);
             auto text_width = font.getStringWidth(button.getButtonText());
-            // bug: сползает при малой высоте и не возвращается
-            button.setBounds(margin * 2, static_cast<int>(_y), roundToInt(text_width + font_height * 1.5f + margin * 2 + _tick_width), height);
+            button.setBounds(margin * 2, 0, roundToInt(text_width + font_height * 1.5f + margin * 2), height);
         }
 
-        void set_header_label_bounds(Label& label) { // todo: восстановить стандартное поведение в случае лабела
-            Font font(font_height);
-            auto text_width = font.getStringWidth(label.getText());
-            // bug: сползает при малой высоте и не возвращается
-            label.setBounds(margin * 2, static_cast<int>(_y), roundToInt(text_width + margin * 2), height);
-        }
-
-        void drawToggleButton(Graphics& g, ToggleButton& button,
-            bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
+        void drawToggleButton(Graphics& g, ToggleButton& button, bool highlighted, bool down)
         {
             auto font_size  = jmin(font_height, button.getHeight() * 0.75f);
             auto tick = font_size * 1.1f;
-
-            _tick_width = tick;
 
             g.setColour(get_bg_color());
             g.fillAll();
@@ -91,8 +71,8 @@ namespace theme
                 tick, tick,
                 button.getToggleState(),
                 button.isEnabled(),
-                shouldDrawButtonAsHighlighted,
-                shouldDrawButtonAsDown);
+                highlighted,
+                down);
 
             g.setColour(button.findColour(ToggleButton::textColourId));
             Font font(font_size);
@@ -107,19 +87,23 @@ namespace theme
                 Justification::centredLeft, 10);
         }
 
-        void drawGroupComponentOutline(Graphics& g, int width_, int height_,
-            const String&, const Justification&,
+        void drawGroupComponentOutline(Graphics& g, int _width, int _height,
+            const String& text, const Justification& /*position*/,
             GroupComponent& group)
         {
+            const auto text_edge_gap = 4.0f;
+
             Font f(font_height);
             Path p;
-            auto y   = _y = f.getAscent() - 2.0f;
-            auto w   = static_cast<float>(width_);
-            auto h   = static_cast<float>(height_) - y;
-            auto cs  = jmin(5.0f, w * 0.5f, h * 0.5f);
-            auto cs2 = 2.0f * cs;
+            auto y      = f.getAscent() - 2.0f;
+            auto w      = static_cast<float>(_width);
+            auto h      = static_cast<float>(_height) - y;
+            auto cs     = jmin(5.0f, w * 0.5f, h * 0.5f);
+            auto cs2    = 2.0f * cs;
+            auto text_w = text.isEmpty() ? 0.0f : f.getStringWidth(text) + text_edge_gap * 2.0f;
+            auto text_x = cs + text_edge_gap;
 
-            p.startNewSubPath(cs, y);
+            p.startNewSubPath(text_x + text_w + 2.0f, y);
             p.lineTo(w - cs, y);
 
             p.addArc(w - cs2, y, cs2, cs2, 0.0f, MF_PI_2);
@@ -132,12 +116,19 @@ namespace theme
             p.lineTo(0.0f, y + cs);
 
             p.addArc(0.0f, y, cs2, cs2, MF_PI * 1.5f, MF_PI * 2.0f);
-            p.lineTo(0.0f + cs, y);
+            p.lineTo(0.0f + text_x, y);
 
-            g.setColour(group.findColour(GroupComponent::outlineColourId)
-                .withMultipliedAlpha(1.0f));
-
+            g.setColour(group.findColour(GroupComponent::outlineColourId));
             g.strokePath(p, PathStrokeType(1.0f));
+
+            g.setColour(group.findColour(GroupComponent::textColourId));
+            g.setFont(f);
+            g.drawText(text,
+                roundToInt(text_x), 2,
+                roundToInt(text_w),
+                roundToInt(font_height),
+                Justification::centred, false
+            );
         }
 
     private:

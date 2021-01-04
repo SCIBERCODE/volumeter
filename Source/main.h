@@ -1,12 +1,15 @@
 ﻿#pragma once
 #include <JuceHeader.h>
 #include <memory>
-#include "gui_theme.h"
 #include "settings.h"
 
-extern unique_ptr<theme::light_> __theme;
+#define _USE_MATH_DEFINES
+#include <math.h>
 
-const map<int, String> _prefs = {
+const auto MF_PI   = static_cast<float>(M_PI);
+const auto MF_PI_2 = static_cast<float>(M_PI_2);
+
+const map<int, String> __prefs = {
     { -15, L"f" },
     { -12, L"p" },
     {  -9, L"n" },
@@ -24,7 +27,7 @@ enum volume_t : size_t {
     VOLUME_SIZE
 };
 
-const map<volume_t, String> _stat_captions = {
+const map<volume_t, String> __stat_captions = {
     { LEFT,    L"Left"    },
     { RIGHT,   L"Right"   },
     { BALANCE, L"Balance" }
@@ -50,18 +53,24 @@ enum labels_stat_column_t : size_t {
 };
 
 template <typename T>
-void operator ++(T& value, int)
+void operator ++(T& value, int) // todo: проверить на вызовы с другими типами помимо перечислений, описанных выше
 {
     value = static_cast<T>(value + 1);
 }
 
-String prefix(double value, const wchar_t *unit, size_t numder_of_decimals);
+void operator --(volume_t& value, int)
+{
+    value = value == 0 ? VOLUME_SIZE : static_cast<volume_t>(value - 1); // todo: странные дела, лучше от этого избавиться
+}
+
+String prefix  (double value, const wchar_t *unit, size_t numder_of_decimals);
 String prefix_v(double value);
 
 bool is_about_equal(float a, float b);
-bool round_flt(float value);
+bool round_flt     (float value);
 
-//=========================================================================================
+class main_component_;
+
 class application_ : public JUCEApplication
 {
 public:
@@ -75,35 +84,20 @@ public:
     bool  moreThanOneInstanceAllowed() override;
 
 protected:
-
     class main_window_ : public DocumentWindow
     {
     public:
-        main_window_ (const String& name, Component* component, JUCEApplication& a) :
-            DocumentWindow(name, __theme->get_bg_color(), DocumentWindow::allButtons),
-            app(a)
-        {
-            setUsingNativeTitleBar(false);
-            setTitleBarTextCentred(true);
-            setResizable(true, false);
-            setContentOwned(component, true);
-            centreWithSize(getWidth(), getHeight());
-            setVisible(true);
-            toFront(true);
-        }
-
-        void closeButtonPressed() override
-        {
-            app.systemRequestedQuit();
-        }
+        main_window_(const String& name, JUCEApplication& a);
+        void closeButtonPressed() override;
 
     private:
-        JUCEApplication& app;
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_window_)
+        JUCEApplication&            _app;
+        unique_ptr<main_component_> _content;
 
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_window_)
     };
 
 private:
-    unique_ptr<main_window_> main_window;
+    unique_ptr<main_window_> _main_window;
 
 };
