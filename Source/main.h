@@ -9,7 +9,7 @@
 const auto MF_PI   = static_cast<float>(M_PI);
 const auto MF_PI_2 = static_cast<float>(M_PI_2);
 
-const map<int, String> __prefs = {
+const map<int, String> __prefs {
     { -15, L"f" },
     { -12, L"p" },
     {  -9, L"n" },
@@ -27,7 +27,7 @@ enum volume_t : size_t {
     VOLUME_SIZE
 };
 
-const map<volume_t, String> __stat_captions = {
+const map<volume_t, String> __stat_captions {
     { LEFT,    L"Left"    },
     { RIGHT,   L"Right"   },
     { BALANCE, L"Balance" }

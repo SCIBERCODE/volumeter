@@ -10,8 +10,8 @@ class main_component_ : public AudioAppComponent,
                         public Timer
 {
 protected:
-    const vector<float>        buff_size_list = { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 10.0f, 30.0f };
-    const vector<int>          tone_list      = { 10, 20, 200, 500, 1000, 5000, 10000, 20000 };
+    const vector<float>        buff_size_list { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 10.0f, 30.0f };
+    const vector<int>          tone_list      { 10, 20, 200, 500, 1000, 5000, 10000, 20000 };
 private:
     signal_                    signal;
     component_calibration_     component_calibration;
@@ -28,7 +28,7 @@ private:
     TooltipWindow              hint              { this                };
     TextButton                 button_zero, button_stat_reset, button_pause_graph;
     ComboBox                   combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
-//=========================================================================================
+//=================================================================================================
 public:
     main_component_() :
         component_calibration(signal),
@@ -72,23 +72,31 @@ public:
             __opt->save(L"combo_tone", value);
         };
 
-        // === stat ======================================================================= // todo: центровать цифры по точке
-        for (auto line = LEFT; line < VOLUME_SIZE; line++) { // todo: заменить таблицей
+        // === stat =======================================================================
+        for (auto line = LEFT; line < VOLUME_SIZE; line++) { // todo: возможно, заменить таблицей
             for (auto column = LABEL; column < LABELS_STAT_COLUMN_SIZE; column++)
             {
                 if (column == LABEL)
                 {
-                    auto checkbox = make_unique<ToggleButton>();
+                    auto  checkbox = make_unique<ToggleButton>();
+                    auto& props    = checkbox->getProperties();
+
                     addAndMakeVisible(checkbox.get());
                     checkbox->setButtonText(__stat_captions.at(line));
                     checkbox->setLookAndFeel(&theme_right_text);
                     if (line != BALANCE) checkbox->setTooltip(L"Show " + __stat_captions.at(line).toLowerCase() + L" channel on the graph");
-                    switch (line) {
+
+                    switch (line)
+                    {
                     case LEFT   : checkbox->setToggleState(__opt->get_int    (L"graph_left"),  dontSendNotification);
-                                  checkbox->onClick = [&, line] { __opt->save(L"graph_left", check_stat[line]->getToggleState()); }; break;
+                                  checkbox->onClick = [&, line] { __opt->save(L"graph_left", check_stat[line]->getToggleState()); };
+                                  break;
                     case RIGHT  : checkbox->setToggleState (__opt->get_int   (L"graph_right"), dontSendNotification);
-                                  checkbox->onClick = [&, line] { __opt->save(L"graph_right", check_stat[line]->getToggleState()); }; break;
-                    case BALANCE: checkbox->getProperties().set  (Identifier(L"dont_show_tick"), true); break;
+                                  checkbox->onClick = [&, line] { __opt->save(L"graph_right", check_stat[line]->getToggleState()); };
+                                  props.set(Identifier(L"color"), static_cast<int>(Colours::green.getARGB()));
+                                  break;
+                    case BALANCE: props.set(Identifier(L"dont_show_tick"), true);
+                                  break;
                     }
                     check_stat[line] = move(checkbox);
                 }
@@ -165,9 +173,9 @@ public:
             check->setLookAndFeel(nullptr);
     }
 
-    //=====================================================================================
-    void load_devices()
-    {
+
+    void load_devices() {
+        //=========================================================================================
         addAndMakeVisible(combo_dev_types);
         addAndMakeVisible(combo_dev_outputs);
         addAndMakeVisible(combo_dev_rates);
@@ -249,7 +257,9 @@ public:
         };
     }
 
-    //=====================================================================================
+    //=============================================================================================
+    // переопределённые методы
+
     void releaseResources() override { }
 
     void prepareToPlay(const int /*samples_per_block*/, const double sample_rate) override
@@ -264,7 +274,7 @@ public:
         signal.next_audio_block(buffer);
     }
 
-    void resized() override // todo: при достаточной ширине менять вёрстку
+    void resized() override // todo: широкое окно
     {
         auto area = getLocalBounds().reduced(theme::margin * 2);
         auto combo_with_label = [&](ComboBox& combo)
@@ -339,7 +349,7 @@ public:
         auto rms = signal.get_rms();
         if (rms.size() == 0) return;
 
-        function<String(double)> print;
+        function<String(double)> print; // todo: центровать цифры по точке
 
         auto calibrate = component_calibration.is_active();
         if (calibrate)

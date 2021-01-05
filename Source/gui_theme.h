@@ -136,19 +136,18 @@ namespace theme
 
     };
 
-    //=========================================================================================
-    class checkbox_left_tick_ : public light_
-    //=========================================================================================
-    {
-    public:
+    class checkbox_left_tick_ : public light_ {
+        //=========================================================================================
+        public:
         void drawToggleButton(Graphics& g, ToggleButton& button,
             bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
         {
-            auto font_size = jmin(font_height, button.getHeight() * 0.75f);
+            auto font_size  = jmin(font_height, button.getHeight() * 0.75f);
             auto tick_width = font_size * 1.1f;
+            auto props      = button.getProperties();
+            bool show_tick  = !props.contains(Identifier(L"dont_show_tick"));
+            auto checked    = show_tick && button.getToggleState();
 
-            auto props = button.getProperties();
-            bool show_tick = !props.contains(Identifier(L"dont_show_tick"));
             if (show_tick) {
                 drawTickBox(g, button, 4.0f, (button.getHeight() - tick_width) * 0.5f,
                     tick_width, tick_width,
@@ -160,9 +159,14 @@ namespace theme
             else
                 tick_width = 0.0f;
 
-            g.setColour(button.findColour(ToggleButton::textColourId));
+            auto text_color_default = button.findColour(ToggleButton::textColourId);
+            auto text_color = Colour(
+                static_cast<int>(props.getWithDefault("color",
+                static_cast<int>(text_color_default.getARGB()))));
+
             Font font(14.0f);
-            g.setFont(show_tick && button.getToggleState() ? font.boldened() : font);
+            g.setColour(checked ? text_color      : text_color_default);
+            g.setFont  (checked ? font.boldened() : font);
 
             if (!button.isEnabled())
                 g.setOpacity(0.5f);
@@ -174,11 +178,12 @@ namespace theme
         }
     };
 
-    //=========================================================================================
-    class checkbox_right_tick_ : public light_
-    //=========================================================================================
-    {
-    public:
+    /** изменение стандартного левого положения галочки у checkbox на правое,
+        выделение жирным шрифтом при включении
+    */
+    class checkbox_right_tick_ : public light_ {
+        //=========================================================================================
+        public:
         void drawToggleButton(Graphics& g, ToggleButton& button,
             bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
         {

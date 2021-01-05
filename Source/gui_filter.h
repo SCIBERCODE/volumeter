@@ -10,7 +10,7 @@ extern unique_ptr<theme::light_> __theme;
 class component_filter_ : public Component
 {
 protected:
-    const vector<int> order_list = { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
+    const vector<int> order_list { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
     const pair<const wchar_t *, const wchar_t *> type_text[FILTER_TYPE_SIZE] =
     {
         make_pair(L"High pass", L"pass_high"),
@@ -109,13 +109,13 @@ public:
         {
             auto line = area.removeFromTop(theme::height);
             line.removeFromRight(theme::margin);
-            combo_order  [type]->setBounds(line.removeFromRight(theme::button_width));
+            combo_order[type]->setBounds(line.removeFromRight(theme::button_width));
             line.removeFromRight(theme::margin);
-            edit_freq    [type]->setBounds(line.removeFromRight(theme::button_width));
-            line.removeFromRight(theme::margin);
-            label_desc   [type]->setBounds(line.removeFromRight(theme::label_width));
-            line.removeFromRight(theme::margin);
-            checkbox_type[type]->setBounds(line);
+            checkbox_type[type]->setBounds(line.removeFromLeft(theme::button_width));
+            line.removeFromLeft(theme::margin);
+            label_desc[type]->setBounds(line.removeFromLeft(theme::label_width));
+            line.removeFromLeft(theme::margin);
+            edit_freq[type]->setBounds(line);
             area.removeFromTop(theme::margin);
         }
         group.setBounds(getLocalBounds());

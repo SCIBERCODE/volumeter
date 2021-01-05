@@ -8,9 +8,9 @@ using namespace spuce;
 
 extern unique_ptr<settings_> __opt;
 
-//=========================================================================================
+//=================================================================================================
 class sin_
-//=========================================================================================
+//=================================================================================================
 {
 public:
     sin_() : sampling_rate(44100.0),
@@ -48,27 +48,36 @@ private:
            angles[VOLUME_SIZE];
 };
 
-//=========================================================================================
+//=================================================================================================
 class circle_
-//=========================================================================================
+//=================================================================================================
 {
 protected:
-    struct iterator
+    struct iterator_t
     {
         size_t   size;
         size_t   pointer;
         volume_t channel;
     };
-private:
-    unique_ptr<float[]> buffers[VOLUME_SIZE];
-    size_t              tails  [VOLUME_SIZE];
-    size_t              max_size;
-    iterator            it;
-public:
-    circle_(const size_t max_size) : max_size(max_size)
+    struct value_t
     {
-        for (auto& buffer : buffers)
-            buffer = make_unique<float[]>(max_size);
+        float    value; // подразумевается хранение любых данных
+        uint64_t index;
+    };
+private:
+    unique_ptr<value_t[]> _buffers[VOLUME_SIZE];
+    size_t                _tails  [VOLUME_SIZE];
+    const size_t          _max_size;
+    iterator_t            _it;
+    uint64_t              _index;
+    bool                  _full; // как минимум единажды буфер был заполнен
+    size_t                _skip; // todo: для графика ввести зависимость от размера буфера (возможно, стоит ожидать его заполнения, после чего начинать измерения)
+public:
+    circle_(const size_t max_size) :
+        _max_size(max_size), _index(0), _full(false), _skip(13)
+    {
+        for (auto& buffer : _buffers)
+            buffer = make_unique<value_t[]>(_max_size);
 
         clear();
     }
@@ -76,24 +85,41 @@ public:
     void clear()
     {
         for (auto line = LEFT; line < VOLUME_SIZE; line++) {
-            if (buffers[line])
-                fill_n(buffers[line].get(), max_size, numeric_limits<float>::quiet_NaN());
+            if (_buffers[line])
+                for (size_t k = 0; k < _max_size; k++)
+                {
+                    _buffers[line][k].value = numeric_limits<float>::quiet_NaN();
+                    _buffers[line][k].index = 0;
+                }
 
-            tails[line] = 0;
+            _tails[line] = 0;
         }
     }
 
     void enqueue(const volume_t channel, const float value)
     {
-        if (max_size && isfinite(value))
+        // избавление от артефактов первых точек графика по причине частично заполненного буфера
+        // todo: ожидание заполнения и для текстовой статистики с плашкой, сообщающей об ожидании
+        if (_skip > 0) { _skip--; return; }
+        if (_max_size && isfinite(value) && _buffers[channel])
         {
-            buffers[channel][tails[channel]] = value;
-            tails[channel] = (tails[channel] + 1) % max_size;
+            auto& new_value  = _buffers[channel][_tails[channel]];
+            _tails[channel] = (_tails[channel] + 1) % _max_size;
+
+            if (_tails[channel] == 0)
+                _full = true;
+
+            new_value.value = value;
+            new_value.index = _index++;
         }
     }
 
+    bool is_full() {
+        return _full;
+    }
+
     float get_tail(const volume_t channel) {
-        return buffers[channel][tails[channel]];
+        return _buffers[channel][_tails[channel]].value;
     }
 
     double get_rms(const volume_t channel)
@@ -101,46 +127,58 @@ public:
         double sum = 0.0;
         size_t size = 0;
 
-        for (size_t k = 0; k < max_size; ++k)
+        for (size_t k = 0; k < _max_size; ++k)
         {
-            auto sample = buffers[channel][k];
-            if (isfinite(sample)) {
-                sum += sample;
+            auto value = _buffers[channel][k];
+            if (isfinite(value.value)) {
+                sum += value.value;
                 size++;
             }
         }
         return sqrt(sum / size);
     }
 
-    bool get_first_value(const volume_t channel, const size_t size, float& value) {
-        if (size == 0 || size > max_size || /* bug: исправить логику */ tails[channel] == 0)
+    /** начало цикла извлечения значений буфера, в дальнейшем вызывается circle_::get_next_value
+        @param index уникальный идентификатор значения в буфере
+    */
+    bool get_first_value(const volume_t channel, const size_t size, float& value, uint64_t* index = nullptr) {
+        if (size == 0 || size > _max_size || _tails[channel] == 0)/* bug: исправить логику */
             return false;
 
-        it.pointer = tails[channel] - 1;
-        it.size    = size;
-        it.channel = channel;
-        return get_next_value(value);
+        _it.pointer = _tails[channel] - 1;
+        _it.size    = size;
+        _it.channel = channel;
+        return get_next_value(value, index);
     }
 
-    bool get_next_value(float& value) {
-        auto result = numeric_limits<float>::quiet_NaN();
-        if (it.pointer >= 0 && it.size)
+    /** извлечение значений буфера
+        @return о завершении сообщается возвратом false
+    */
+    bool get_next_value(float& value, uint64_t* index = nullptr) {
+        value_t result;
+
+        result.value = numeric_limits<float>::quiet_NaN();
+        result.index = 0;
+
+        if (_it.pointer >= 0 && _it.size)
         {
-            result = buffers[it.channel][it.pointer];
-            if (it.pointer == 0)
-                it.pointer = max_size - 1;
+            result = _buffers[_it.channel][_it.pointer];
+            if (_it.pointer == 0)
+                _it.pointer = _max_size - 1;
             else
-                it.pointer--;
+                _it.pointer--;
 
-            it.size--;
+            _it.size--;
         };
-        if (!isfinite(result))
-            it = { 0 };
+        if (!isfinite(result.value))
+            _it = { 0 };
+        else
+        {
+            value = result.value;
+            if (index) *index = result.index;
+        }
 
-        if (isfinite(result))
-            value = result;
-
-        return isfinite(result);
+        return isfinite(result.value);
     }
 
     auto get_extremes(const volume_t channel, const size_t size) {
@@ -165,9 +203,9 @@ private:
 
 };
 
-//=========================================================================================
+//=================================================================================================
 class signal_
-//=========================================================================================
+//=================================================================================================
 {
 private:
     double              _sample_rate;

@@ -6,9 +6,24 @@ extern unique_ptr<settings_> __opt;
 
 // bug: начинать график с устоявшихся значений
 //      провалы вверх при переключении фильтра
+//         ! и, соответственно, вниз при частично заполненном буфере, что происходит при переключении параметров
 
 class component_graph_ : public Component
 {
+protected:
+    struct range_t
+    {
+        uint64_t start;
+        uint64_t stop;
+    };
+    enum class range_types_t : size_t
+    {
+        tone,
+        zero,
+        //calibration, // todo: пересчитывать все значения, график не должен визуально изменяться
+        high_pass,
+        low_pass
+    };
 private:
     Rectangle<int>      _plot;
     Rectangle<int>      _plot_indented;
@@ -30,7 +45,7 @@ public:
 
     void enqueue(const vector<double>& rms) {
         if (__opt->get_int(L"graph_paused") == 0) {
-            if (isfinite(rms.at(LEFT))) { // todo: syncrochannels
+            if (isfinite(rms.at(LEFT))) {
                 _graph_data->enqueue(LEFT,  static_cast<float>(rms.at(LEFT )));
                 _graph_data->enqueue(RIGHT, static_cast<float>(rms.at(RIGHT)));
                 repaint(); // todo: оптимизировать
@@ -38,11 +53,12 @@ public:
         }
     }
 
-    //=========================================================================================
+    // todo: иконка взаимной зависимости каналов (единое масштабирование)
+    //       настройка сглаживания графика
     /** построение линии сигнала, масштабирование и отрисовка
     */
     void draw_graph_line(const volume_t channel, Graphics& g) {
-        //=====================================================================================
+        //=========================================================================================
         auto  offset = 0.0f;
         float value;
         Path  path;
@@ -66,11 +82,12 @@ public:
             if (!_graph_data->get_next_value(value))
                 break;
         }
-        if (path.getLength() == 0.0f) // bug: как минимум единажды эта проверка оказалось недостаточной
+        if (path.getLength() == 0.0f) // bug: как минимум единажды этой проверки оказалось недостаточно
             return;
 
         const auto subpixel_correction = 0.2f;
 
+        // bug: масштабирование на гомогенных данных роняет алгоритм
         path.scaleToFit(
             _plot_indented.getWidth()  - offset,
             _plot_indented.getY()      - subpixel_correction,
@@ -79,15 +96,29 @@ public:
             false
         );
         g.setColour(channel == LEFT ? Colours::black : Colours::green);
+
+        /*PathFlatteningIterator it(path);
+        while (it.next());
+        PathFlatteningIterator it2(path);
+
+        size_t count = 0;
+        while (it2.next()) {
+            if (count > it.subPathIndex - 10) break;
+            Point<float> a(it2.x1, it2.y1); Point<float> b(it2.x2, it2.y2);
+            Line<float> line(a, b);
+            g.drawLine(line);
+            count++;
+        }*/
+
         g.strokePath(path, PathStrokeType(1.0f + subpixel_correction));
     }
 
     // todo: подсветка точки треугольником на линии графика
-    //=========================================================================================
+    //       точки лишь в позиции области, подвергшейся коррекции (можно настройкой)
     /** отрисовка экстремумов (правый канал перекрывает левый)
     */
     void draw_extremes(const volume_t channel, Graphics& g) {
-        //=====================================================================================
+        //=========================================================================================
         float value;
         for (auto extremum = MIN; extremum < EXTREMES_SIZE; extremum++)
         {
@@ -110,7 +141,7 @@ public:
                         text_width,
                         13
                     );
-                    int overhung[2] = {
+                    int overhung[2] {
                         rect.getX() - _plot.getX() - 2 /* отступ от рамки */,
                         _plot.getRight() - rect.getRight() - 2,
                     };
@@ -140,11 +171,10 @@ public:
         }
     }
 
-    //=========================================================================================
     /** расшифровка цветов графика
     */
     void draw_legend(Graphics& g) {
-        //=====================================================================================
+        //=========================================================================================
         const size_t line_width = 25;
         Rectangle<int> rect
         (
@@ -165,13 +195,14 @@ public:
         }
     }
 
-    //=========================================================================================
+    // todo: график состава групп
+    //       также отображать изменение параметров, влиящих на вид графика
     /** рисование линий, заливок и прочей индикации
     */
     void draw_indications(Graphics& g) {
-        //=====================================================================================
-        const float dotted_pattern[2] = { 2.0f, 3.0f };
-        Line<int> lines[2] = {
+        //=========================================================================================
+        const float dotted_pattern[2] { 2.0f, 3.0f };
+        Line<int> lines[2] {
             {_plot_indented.getX(), _plot_indented.getY(),      _plot_indented.getRight(), _plot_indented.getY()      },
             {_plot_indented.getX(), _plot_indented.getBottom(), _plot_indented.getRight(), _plot_indented.getBottom() }
         };
@@ -180,8 +211,9 @@ public:
         g.drawDashedLine(lines[1].toFloat(), dotted_pattern, _countof(dotted_pattern));
     }
 
-    void paint(Graphics& g) override
-    {
+    //=============================================================================================
+    void paint(Graphics& g) override {
+        //=========================================================================================
         _plot          = getLocalBounds();
         _plot_indented = getLocalBounds();
 

@@ -7,7 +7,7 @@ protected:
         String default_value;
     };
 
-    const multimap<String, option_t> options = {
+    const multimap<String, option_t> options {
         { L"combo_dev_type",     { L"device_type",        L"ASIO"  } },
         { L"combo_dev_output",   { L"device",             { }      } },
         { L"combo_dev_rate",     { L"sample_rate",        L"44100" } },
@@ -36,7 +36,10 @@ protected:
     };
 
 private:
-    // поиск как по ключам, так и по строкам конфига
+    /** поиск как по ключам, так и по строкам конфига, иначе говоря,
+        первые два столбца settings_::options имеют одинаковый вес при поиске,
+        но в порядке очерёдности
+    */
     const option_t* get_option(const String& request) {
         auto find_key = options.find(request);
 
@@ -73,7 +76,7 @@ public:
         }
     }
 
-    String get_text(const String& component_name) {
+    const String get_text(const String& component_name) {
         if (auto option = get_option(component_name))
             return settings.getUserSettings()->getValue
             (
