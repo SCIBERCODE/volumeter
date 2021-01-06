@@ -40,7 +40,7 @@ private:
                    label_cal_channels { { }, L"Left/Right"      };
     TableListBox   table_cals;
     TextEditor     editor_cal_name;
-    TextEditor     editor_cal_channels[VOLUME_SIZE];
+    TextEditor     editor_cal_channels[CHANNEL_SIZE];
     ComboBox       combo_prefix;
     TextButton     button_cal_add;
 
@@ -98,10 +98,10 @@ public:
         button_cal_add.setButtonText(L"Add");
         button_cal_add.onClick = [=]
         {
-            double channels[VOLUME_SIZE];
+            double channels[CHANNEL_SIZE];
             const auto pref = __opt->get_int(L"combo_prefix");
 
-            for (auto channel = LEFT; channel <= RIGHT; channel++)
+            for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
             {
                 auto channel_text = editor_cal_channels[channel].getText();
                 if (channel_text.isEmpty())

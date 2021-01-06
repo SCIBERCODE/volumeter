@@ -63,7 +63,7 @@ void operator ++(T& value, int) // todo: проверить на вызовы с
 
 void operator --(channel_t& value, int)
 {
-    value = value == 0 ? CHANNEL_SIZE : static_cast<channel_t>(value - 1); // todo: странные дела, лучше от этого избавиться
+    value = value == 0 ? CHANNEL_SIZE : static_cast<channel_t>(value - 1);
 }
 
 String prefix  (double value, const wchar_t *unit, size_t numder_of_decimals);

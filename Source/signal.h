@@ -14,36 +14,35 @@ class sin_
 {
 private:
     double
-        sampling_rate,
-        freq,
-        angle_delta,
-        angles[CHANNEL_SIZE];
-
+        _sample_rate,
+        _frequency,
+        _angle_delta,
+        _angles[CHANNEL_SIZE];
 public:
-    sin_() : sampling_rate(44100.0),
-             angle_delta  (0.0),
-             freq         (0.0)
+    sin_() : _sample_rate(44100.0),
+             _angle_delta(0.0),
+             _frequency  (0.0)
     {
         reset();
     }
     void set_sample_rate(const double sample_rate) {
-        sampling_rate = sample_rate;
+        _sample_rate = sample_rate;
     }
     void reset() {
-        for (auto& angle : angles)
+        for (auto& angle : _angles)
             angle = 0.0;
     }
     void set_freq(const float frequency) {
-        freq = frequency;
-        auto cycles_per_sample = frequency / sampling_rate;
-        angle_delta = cycles_per_sample * 2.0 * M_PI;
+        _frequency = frequency;
+        auto cycles_per_sample = frequency / _sample_rate;
+        _angle_delta = cycles_per_sample * 2.0 * M_PI;
     }
     auto sample(const channel_t channel) {
-        auto current_sample = sin(angles[channel]);
-        angles[channel] += angle_delta;
+        auto current_sample = sin(_angles[channel]);
+        _angles[channel] += _angle_delta;
 
-        if (angles[channel] > 2.0 * M_PI)
-            angles[channel] -= 2.0 * M_PI;
+        if (_angles[channel] > 2.0 * M_PI)
+            _angles[channel] -= 2.0 * M_PI;
 
         return static_cast<float>(current_sample);
     }
@@ -111,37 +110,37 @@ public:
         }
     }
 
-    bool is_full() {
+    auto is_full() {
         return _full;
     }
 
-    double get_tail(const channel_t channel) {
+    auto get_tail(const channel_t channel) {
         return _buffers[channel][_tails[channel]].value;
     }
 
-    bool get_rms(array<double, CHANNEL_SIZE>& channels)
+    bool get_rms(array<double, VOLUME_SIZE>& rms)
     {
-        double sum[CHANNEL_SIZE] = { 0.0,0.0 };
-        size_t size[CHANNEL_SIZE] = { 0,0 };
+        double sum [CHANNEL_SIZE] = { 0.0, 0.0 };
+        size_t size[CHANNEL_SIZE] = { 0, 0 };
 
         for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
             for (size_t k = 0; k < _max_size; ++k)
             {
                 auto value = _buffers[channel][k];
                 if (isfinite(value.value)) {
-                    sum[channel] += value.value;
+                    sum [channel] += value.value;
                     size[channel]++;
                 }
             }
 
         if (size[LEFT] && size[RIGHT] && _full) {
-            channels[LEFT] = sqrt(sum[LEFT] / size[LEFT]);
-            channels[RIGHT] = sqrt(sum[RIGHT] / size[RIGHT]);
+            rms[LEFT   ] = sqrt(sum[LEFT ] / size[LEFT ]);
+            rms[RIGHT  ] = sqrt(sum[RIGHT] / size[RIGHT]);
+            rms[BALANCE] = abs (sum[LEFT ] - sum[RIGHT]);
             return true;
         }
         else
             return false;
-
     }
 
     /** начало цикла извлечения значений буфера, в дальнейшем вызывается circle_::get_next_value
@@ -244,10 +243,14 @@ public:
             _zeros[RIGHT] = value_right;
         }
         else {
-            /*_zeros[LEFT ] = gain2db(_buff->get_rms(LEFT ));
-            _zeros[RIGHT] = gain2db(_buff->get_rms(RIGHT));
-            __opt->save(L"zero_value_left" , _zeros[LEFT ]);
-            __opt->save(L"zero_value_right", _zeros[RIGHT]);*/
+            array<double, VOLUME_SIZE> rms;
+            if (_buff->get_rms(rms))
+            {
+                _zeros[LEFT ] = gain2db(rms[LEFT ]);
+                _zeros[RIGHT] = gain2db(rms[RIGHT]);
+                __opt->save(L"zero_value_left",  _zeros[LEFT ]);
+                __opt->save(L"zero_value_right", _zeros[RIGHT]);
+            }
         }
         extremes_clear();
     }
@@ -301,7 +304,7 @@ public:
         _orders[filter_type] = new_order;
     }
     vector<double> get_rms() {
-        array<double, CHANNEL_SIZE> result;
+        array<double, VOLUME_SIZE> result;
         if (_buff && _buff->get_rms(result))
         {
             return { result[LEFT], result[RIGHT] };
