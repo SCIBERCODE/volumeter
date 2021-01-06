@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <JuceHeader.h>
 #include <memory>
 #include "settings.h"
@@ -10,43 +10,46 @@ const auto MF_PI   = static_cast<float>(M_PI);
 const auto MF_PI_2 = static_cast<float>(M_PI_2);
 
 const map<int, String> __prefs {
-    { -15, L"f" },
-    { -12, L"p" },
-    {  -9, L"n" },
-    {  -6, L"μ" },
-    {  -3, L"m" },
-    {   0, L""  },
-    {   3, L"k" },
-    {   6, L"M" }
+    { -15, L"f"      },
+    { -12, L"p"      },
+    {  -9, L"n"      },
+    {  -6, L"\u00b5" },
+    {  -3, L"m"      },
+    {   0, L""       },
+    {   3, L"k"      },
+    {   6, L"M"      }
+};
+
+enum channel_t : size_t {
+    LEFT,
+    RIGHT,
+    CHANNEL_SIZE
 };
 
 enum volume_t : size_t {
-    LEFT = 0,
-    RIGHT,
-    BALANCE,
+    BALANCE = CHANNEL_SIZE,
     VOLUME_SIZE
 };
 
-const map<volume_t, String> __stat_captions {
-    { LEFT,    L"Left"    },
-    { RIGHT,   L"Right"   },
-    { BALANCE, L"Balance" }
+const map<size_t, String> __channel_name {
+    { LEFT,  L"Left"  },
+    { RIGHT, L"Right" }
 };
 
 enum extremum_t : size_t {
-    MIN = 0,
+    MIN,
     MAX,
     EXTREMES_SIZE
 };
 
 enum filter_type_t : size_t {
-    HIGH_PASS = 0,
+    HIGH_PASS,
     LOW_PASS,
     FILTER_TYPE_SIZE
 };
 
 enum labels_stat_column_t : size_t {
-    LABEL = 0,
+    LABEL,
     VALUE,
     EXTREMES,
     LABELS_STAT_COLUMN_SIZE
@@ -58,9 +61,9 @@ void operator ++(T& value, int) // todo: проверить на вызовы с
     value = static_cast<T>(value + 1);
 }
 
-void operator --(volume_t& value, int)
+void operator --(channel_t& value, int)
 {
-    value = value == 0 ? VOLUME_SIZE : static_cast<volume_t>(value - 1); // todo: странные дела, лучше от этого избавиться
+    value = value == 0 ? CHANNEL_SIZE : static_cast<channel_t>(value - 1); // todo: странные дела, лучше от этого избавиться
 }
 
 String prefix  (double value, const wchar_t *unit, size_t numder_of_decimals);

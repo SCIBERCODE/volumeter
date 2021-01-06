@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <JuceHeader.h>
 
 namespace theme
@@ -145,19 +145,14 @@ namespace theme
             auto font_size  = jmin(font_height, button.getHeight() * 0.75f);
             auto tick_width = font_size * 1.1f;
             auto props      = button.getProperties();
-            bool show_tick  = !props.contains(Identifier(L"dont_show_tick"));
-            auto checked    = show_tick && button.getToggleState();
+            auto checked    = button.getToggleState();
 
-            if (show_tick) {
-                drawTickBox(g, button, 4.0f, (button.getHeight() - tick_width) * 0.5f,
-                    tick_width, tick_width,
-                    button.getToggleState(),
-                    button.isEnabled(),
-                    shouldDrawButtonAsHighlighted,
-                    shouldDrawButtonAsDown);
-            }
-            else
-                tick_width = 0.0f;
+            drawTickBox(g, button, 4.0f, (button.getHeight() - tick_width) * 0.5f,
+                tick_width, tick_width,
+                button.getToggleState(),
+                button.isEnabled(),
+                shouldDrawButtonAsHighlighted,
+                shouldDrawButtonAsDown);
 
             auto text_color_default = button.findColour(ToggleButton::textColourId);
             auto text_color = Colour(

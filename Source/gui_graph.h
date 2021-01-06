@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <JuceHeader.h>
 #include "signal.h"
 
@@ -25,11 +25,11 @@ protected:
         low_pass
     };
 private:
-    Rectangle<int>      _plot;
-    Rectangle<int>      _plot_indented;
-    unique_ptr<float[]> _extremes;
-    unique_ptr<circle_> _graph_data;
-    RectangleList<int>  _placed_extremes;
+    Rectangle<int>       _plot;
+    Rectangle<int>       _plot_indented;
+    unique_ptr<double[]> _extremes;
+    unique_ptr<circle_>  _graph_data;
+    RectangleList<int>   _placed_extremes;
 
 public:
     component_graph_ () { reset(); }
@@ -57,11 +57,11 @@ public:
     //       настройка сглаживания графика
     /** построение линии сигнала, масштабирование и отрисовка
     */
-    void draw_graph_line(const volume_t channel, Graphics& g) {
+    void draw_graph_line(const channel_t channel, Graphics& g) {
         //=========================================================================================
-        auto  offset = 0.0f;
-        float value;
-        Path  path;
+        auto   offset = 0.0f;
+        double value;
+        Path   path;
 
         if (_plot_indented.isEmpty())
             return;
@@ -72,8 +72,8 @@ public:
         for ( ; ; offset++)
         {
             if (!isfinite(value)) break;
-            auto x = _plot.getRight() - offset;
-            auto y = -value * (_plot_indented.getHeight() / abs(_extremes[MIN] - _extremes[MAX]));
+            auto  x = _plot.getRight() - offset;
+            auto y = static_cast<float>(-value * (_plot_indented.getHeight() / abs(_extremes[MIN] - _extremes[MAX])));
             if (path.isEmpty())
                 path.startNewSubPath(x, y);
 
@@ -82,7 +82,7 @@ public:
             if (!_graph_data->get_next_value(value))
                 break;
         }
-        if (path.getLength() == 0.0f) // bug: как минимум единажды этой проверки оказалось недостаточно
+        if (path.getLength() == 0.0f || offset == 0.0f) // bug: как минимум единажды этой проверки оказалось недостаточно
             return;
 
         const auto subpixel_correction = 0.2f;
@@ -117,9 +117,9 @@ public:
     //       точки лишь в позиции области, подвергшейся коррекции (можно настройкой)
     /** отрисовка экстремумов (правый канал перекрывает левый)
     */
-    void draw_extremes(const volume_t channel, Graphics& g) {
+    void draw_extremes(const channel_t channel, Graphics& g) {
         //=========================================================================================
-        float value;
+        double value;
         for (auto extremum = MIN; extremum < EXTREMES_SIZE; extremum++)
         {
             size_t offset = 0;
@@ -171,7 +171,8 @@ public:
         }
     }
 
-    /** расшифровка цветов графика
+    /** расшифровка цветов графика, в настоящий момент используется подсветка названия канала
+        вместо заграмождения полей графика
     */
     void draw_legend(Graphics& g) {
         //=========================================================================================
@@ -185,7 +186,7 @@ public:
         );
         for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
-            const auto text = __stat_captions.at(channel);
+            const auto text = __channel_name.at(channel);
             const auto text_width = g.getCurrentFont().getStringWidth(text);
             g.setColour(channel == LEFT ? Colours::black : Colours::green);
             g.drawFittedText(text, rect.removeFromLeft(text_width + theme::margin), Justification::centredLeft, 1);
@@ -225,7 +226,7 @@ public:
         //draw_legend(g);
 
         _placed_extremes.clear();
-        for (auto channel = RIGHT; channel != VOLUME_SIZE; channel--)
+        for (auto channel = RIGHT; channel < CHANNEL_SIZE; channel--)
         {
             if (channel == LEFT  && __opt->get_int(L"graph_left" ) == 0) continue;
             if (channel == RIGHT && __opt->get_int(L"graph_right") == 0) continue;

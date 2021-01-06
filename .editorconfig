@@ -1,4 +1,4 @@
 root = true
 
 [source/*.{cpp,h}]
-charset = utf-8-bom
+charset = utf-8

@@ -27,8 +27,8 @@ protected:
     struct cal_t
     {
         String name;
-        double channel[VOLUME_SIZE];
-        double coeff  [VOLUME_SIZE];
+        double channel[CHANNEL_SIZE];
+        double coeff  [CHANNEL_SIZE];
     };
 private:
     vector<cal_t>  rows;
@@ -151,7 +151,7 @@ public:
         table_cals.updateContent();
     };
 
-    double get_coeff(const volume_t channel) {
+    double get_coeff(const channel_t channel) {
         return selected == -1 ? 1.0 : rows.at(selected).coeff[channel];
     }
 

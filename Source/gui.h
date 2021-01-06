@@ -1,5 +1,6 @@
-﻿#pragma once
+#pragma once
 #include <JuceHeader.h>
+#include <variant>
 #include "gui_filter.h"
 #include "gui_calibration.h"
 #include "gui_graph.h"
@@ -18,8 +19,8 @@ private:
     component_filter_          component_filter;
     component_graph_           component_graph;
     theme::checkbox_left_tick_ theme_right_text;
-    unique_ptr<ToggleButton>   check_stat[VOLUME_SIZE];
-    unique_ptr<Label>          label_stat[VOLUME_SIZE][2 /*VALUE>EXTREMES*/];
+    //variant<shared_ptr<Label>, shared_ptr<ToggleButton>>   stat_controls      [VOLUME_SIZE ][LABELS_STAT_COLUMN_SIZE];
+    Component*                 stat_controls[VOLUME_SIZE][LABELS_STAT_COLUMN_SIZE];
     Label                      label_device_type { { }, L"Type"        },
                                label_device      { { }, L"Device"      },
                                label_sample_rate { { }, L"Sample rate" },
@@ -72,43 +73,52 @@ public:
             __opt->save(L"combo_tone", value);
         };
 
-        // === stat =======================================================================
-        for (auto line = LEFT; line < VOLUME_SIZE; line++) { // todo: возможно, заменить таблицей
+        /** =======================================================================================
+            статистика
+        */
+        for (size_t line = LEFT; line < VOLUME_SIZE; line++) {
             for (auto column = LABEL; column < LABELS_STAT_COLUMN_SIZE; column++)
-            {
                 if (column == LABEL)
                 {
-                    auto  checkbox = make_unique<ToggleButton>();
-                    auto& props    = checkbox->getProperties();
-
-                    addAndMakeVisible(checkbox.get());
-                    checkbox->setButtonText(__stat_captions.at(line));
-                    checkbox->setLookAndFeel(&theme_right_text);
-                    if (line != BALANCE) checkbox->setTooltip(L"Show " + __stat_captions.at(line).toLowerCase() + L" channel on the graph");
-
-                    switch (line)
+                    if (line == LEFT || line == RIGHT)
                     {
-                    case LEFT   : checkbox->setToggleState(__opt->get_int    (L"graph_left"),  dontSendNotification);
-                                  checkbox->onClick = [&, line] { __opt->save(L"graph_left", check_stat[line]->getToggleState()); };
-                                  break;
-                    case RIGHT  : checkbox->setToggleState (__opt->get_int   (L"graph_right"), dontSendNotification);
-                                  checkbox->onClick = [&, line] { __opt->save(L"graph_right", check_stat[line]->getToggleState()); };
-                                  props.set(Identifier(L"color"), static_cast<int>(Colours::green.getARGB()));
-                                  break;
-                    case BALANCE: props.set(Identifier(L"dont_show_tick"), true);
-                                  break;
+                        auto       checkbox     = new ToggleButton();
+                        auto&      props        = checkbox->getProperties();
+                        const auto channel_name = __channel_name.at(line).toLowerCase();
+                        const auto option_name = L"graph_" + channel_name;
+
+                        checkbox->setButtonText(__channel_name.at(line));
+                        checkbox->setLookAndFeel(&theme_right_text);
+                        checkbox->setTooltip(L"Show " + channel_name + L" channel on the graph");
+
+                        checkbox->setToggleState (__opt->get_int(option_name), dontSendNotification);
+                        checkbox->onClick = [=] { __opt->save(option_name, checkbox->getToggleState()); };
+
+                        if (line == RIGHT)
+                            props.set(Identifier(L"color"), static_cast<int>(Colours::green.getARGB()));
+
+                        addAndMakeVisible(checkbox);
+                        stat_controls[line][column] = checkbox;
                     }
-                    check_stat[line] = move(checkbox);
+                    if (line == BALANCE) {
+                        auto label_balance = new Label({ }, L"Balance");
+                        label_balance->setJustificationType(Justification::centredRight);
+                        addAndMakeVisible(label_balance);
+                        stat_controls[line][column] = label_balance;
+                    }
                 }
-                else {
-                    auto label = make_unique<Label>(); // todo: сработка соответствующих галочек при нажатии на цифры показометра
-                    addAndMakeVisible(label.get());
-                    label_stat[line][column - 1] = move(label);
+                else { // todo: сработка соответствующих галочек при нажатии на цифры показометра
+                    auto label = new Label();
+                    addAndMakeVisible(label);
+                    stat_controls[line][column] = label;
                 }
-            }
-            auto label_value = label_stat[line][VALUE - 1].get();
-            label_stat[line][VALUE    - 1]->setFont(label_value->getFont().boldened());
-            label_stat[line][EXTREMES - 1]->setJustificationType(Justification::right);
+
+            auto label_value = (Label *)stat_controls[line][VALUE];
+            label_value->setFont(label_value->getFont().boldened());
+            stat_controls[line][VALUE] = label_value;
+
+            label_value = (Label *)stat_controls[line][EXTREMES];
+            label_value->setJustificationType(Justification::right);
         }
 
         addAndMakeVisible(button_zero);
@@ -169,8 +179,20 @@ public:
         shutdownAudio();
 
         checkbox_tone.setLookAndFeel(nullptr);
-        for (auto& check : check_stat)
-            check->setLookAndFeel(nullptr);
+
+        for (size_t line = LEFT; line < VOLUME_SIZE; line++) {
+            for (auto column = LABEL; column < LABELS_STAT_COLUMN_SIZE; column++)
+            {
+                if (column == LABEL && (line == LEFT || line == RIGHT)) {
+                    auto control = (ToggleButton *)stat_controls[line][column];
+                    delete control;
+                }
+                else {
+                    auto control = (Label *)stat_controls[line][column];
+                    delete control;
+                }
+            }
+        }
     }
 
 
@@ -324,14 +346,25 @@ public:
             auto right  = area.removeFromRight(getWidth() / 2);
             right.removeFromRight(theme::margin * 2);
 
-            for (auto line_index = LEFT; line_index < VOLUME_SIZE; line_index++)
+            for (size_t line_index = LEFT; line_index < VOLUME_SIZE; line_index++)
             {
-                check_stat[line_index]->setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin));
-                label_stat[line_index][VALUE    - 1]->setBounds(area.removeFromTop (theme::height));
-                label_stat[line_index][EXTREMES - 1]->setBounds(right.removeFromTop(theme::height));
+                if (line_index != BALANCE) {
+                    auto control = dynamic_cast<ToggleButton *>(stat_controls[line_index][LABEL]);
+                    control->setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin));
+                }
+                else {
+                    auto control = dynamic_cast<Label *>(stat_controls[line_index][LABEL]);
+                    control->setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin - 3)); // todo: расположить в ряд без подгонки
+                }
+                auto control = dynamic_cast<Label *>(stat_controls[line_index][VALUE]);
+                control->setBounds(area.removeFromTop(theme::height));
+
+                control = dynamic_cast<Label *>(stat_controls[line_index][EXTREMES]);
+                control->setBounds(right.removeFromTop(theme::height));
+
                 remain.removeFromTop(theme::height);
 
-                if (line_index < volume_t::BALANCE) {
+                if (line_index < BALANCE) {
                     area  .removeFromTop(theme::margin);
                     right .removeFromTop(theme::margin);
                     left  .removeFromTop(theme::margin);
@@ -354,12 +387,12 @@ public:
         auto calibrate = component_calibration.is_active();
         if (calibrate)
         {
-            rms.at(LEFT)  *= component_calibration.get_coeff(LEFT); // bug: при неучтённом префиксе
+            rms.at(LEFT ) *= component_calibration.get_coeff(LEFT ); // bug: при неучтённом префиксе
             rms.at(RIGHT) *= component_calibration.get_coeff(RIGHT);
             print = prefix_v;
         }
         else {
-            rms.at(LEFT)  = signal.gain2db(rms.at(LEFT))  - signal.zero_get(LEFT);
+            rms.at(LEFT ) = signal.gain2db(rms.at(LEFT )) - signal.zero_get(LEFT );
             rms.at(RIGHT) = signal.gain2db(rms.at(RIGHT)) - signal.zero_get(RIGHT);
             print = [ ](double value) { return String(value, 3) + L" dB"; };
         }
@@ -368,7 +401,7 @@ public:
         component_graph.enqueue(rms);
 
         String printed[3];
-        for (auto line = LEFT; line < VOLUME_SIZE; line++)
+        for (size_t line = LEFT; line < VOLUME_SIZE; line++)
         {
             fill_n(printed, _countof(printed), theme::empty);
             auto extremes = signal.extremes_get(line);
@@ -377,9 +410,12 @@ public:
             if (isfinite(extremes[MIN])) printed[1] = print(extremes[MIN]);
             if (isfinite(extremes[MAX])) printed[2] = print(extremes[MAX]);
 
-            label_stat[line][0]->setText(printed[0], dontSendNotification);
-            label_stat[line][1]->setText(printed[1] + L" .. " + printed[2], dontSendNotification);
-            label_stat[line][0]->setColour(Label::textColourId, isfinite(rms.at(line)) ? Colours::black : Colours::grey);
+            auto control = dynamic_cast<Label *>(stat_controls[line][VALUE]);
+            control->setText(printed[0], dontSendNotification);
+            control->setColour(Label::textColourId, isfinite(rms.at(line)) ? Colours::black : Colours::grey);
+
+            control = dynamic_cast<Label *>(stat_controls[line][EXTREMES]);
+            control->setText(printed[1] + L" .. " + printed[2], dontSendNotification);
         }
 
         if (button_zero.isEnabled() == calibrate) { // todo: логику без этого
