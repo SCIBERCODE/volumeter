@@ -19,28 +19,30 @@ class main_component_ : public AudioAppComponent,
                         public Timer
 {
 protected:
-    const vector<float>        buff_size_list { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 10.0f, 30.0f };
-    const vector<int>          tone_list      { 10, 20, 200, 500, 1000, 5000, 10000, 20000 };
+    signal_                    _signal;
+    const vector<float>        _buff_size_list   { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f, 30.0f };
+    const vector<int>          _tone_list        { 10, 20, 200, 500, 1000, 2000, 5000, 10000, 20000 };
 private:
-    signal_                    signal;
-    component_calibration_     component_calibration;
-    component_filter_          component_filter;
-    component_graph_           component_graph;
-    theme::checkbox_left_tick_ theme_right_text;
-    controls_t                 stat_controls     [VOLUME_SIZE][LABELS_STAT_COLUMN_SIZE];
     Label                      label_device_type { { }, L"Type"        },
                                label_device      { { }, L"Device"      },
                                label_sample_rate { { }, L"Sample rate" },
                                label_buff_size   { { }, L"Buff size"   };
-    ToggleButton               checkbox_tone     { L"Tone"             };
+    ToggleButton               checkbox_tone     {      L"Tone"        };
     TooltipWindow              hint              { this                };
+
+    component_calibration_     component_calibration;
+    component_filter_          component_filter;
+    component_graph_           component_graph;
+    theme::checkbox_left_tick_ theme_left_tick; // должно быть объявлено раньше stat_controls
     TextButton                 button_zero, button_stat_reset, button_pause_graph;
     ComboBox                   combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
+    controls_t                 stat_controls[VOLUME_SIZE][LABELS_STAT_COLUMN_SIZE];
+
 //=================================================================================================
 public:
     main_component_() :
-        component_calibration(signal),
-        component_filter     (signal)
+        component_calibration(_signal),
+        component_filter     (_signal)
     {
         load_devices();
 
@@ -51,32 +53,33 @@ public:
         addAndMakeVisible(combo_tone);
 
         label_buff_size.attachToComponent(&combo_buff_size, true);
-        for (const auto item : buff_size_list)
+        for (const auto item : _buff_size_list)
             combo_buff_size.addItem(prefix(item, L"s", 0), static_cast<int>(item * 1000));
 
         combo_buff_size.setSelectedId(__opt->get_int(L"combo_buff_size"));
         combo_buff_size.onChange = [this]
         {
             auto value = combo_buff_size.getSelectedId();
-            signal.change_buff_size(value);
+            _signal.change_buff_size(value);
             __opt->save(L"combo_buff_size", value);
+            component_graph.begin_waiting(value);
         };
 
         checkbox_tone.setToggleState(__opt->get_int(L"checkbox_tone"), dontSendNotification);
-        checkbox_tone.setLookAndFeel(&theme_right_text);
+        checkbox_tone.setLookAndFeel(&theme_left_tick);
         checkbox_tone.onClick = [this]
         {
-            signal.extremes_clear();
+            _signal.extremes_clear();
             __opt->save(L"checkbox_tone", checkbox_tone.getToggleState());
         };
-        for (const auto item : tone_list)
+        for (const auto item : _tone_list)
             combo_tone.addItem(prefix(item, L"Hz", 0), item);
 
         combo_tone.setSelectedId(__opt->get_int(L"combo_tone"));
         combo_tone.onChange = [this]
         {
             auto value = combo_tone.getSelectedId();
-            signal.set_freq(value);
+            _signal.set_freq(value);
             __opt->save(L"combo_tone", value);
         };
 
@@ -96,7 +99,7 @@ public:
                         const auto option_name = L"graph_" + channel_name;
 
                         checkbox->setButtonText(__channel_name.at(line));
-                        checkbox->setLookAndFeel(&theme_right_text);
+                        checkbox->setLookAndFeel(&theme_left_tick);
                         checkbox->setTooltip(L"Show " + channel_name + L" channel on the graph");
 
                         checkbox->setToggleState (__opt->get_int(option_name), dontSendNotification);
@@ -150,13 +153,13 @@ public:
             auto value = button_zero.getToggleState();
             __opt->save(L"button_zero", value);
             if (value)
-                signal.zero_set();
+                _signal.zero_set();
             else
-                signal.zero_clear();
+                _signal.zero_clear();
         };
         if (__opt->get_int(L"button_zero")) {
             button_zero.setToggleState(true, dontSendNotification);
-            signal.zero_set(
+            _signal.zero_set(
                 __opt->get_text(L"zero_value_left" ).getDoubleValue(),
                 __opt->get_text(L"zero_value_right").getDoubleValue()
             );
@@ -172,7 +175,7 @@ public:
 
         button_stat_reset.onClick = [this]
         {
-            signal.extremes_clear();
+            _signal.extremes_clear();
             component_graph.reset();
         };
 
@@ -208,7 +211,7 @@ public:
         label_sample_rate.attachToComponent(&combo_dev_rates,   true);
 
         const OwnedArray<AudioIODeviceType>& types = deviceManager.getAvailableDeviceTypes();
-        if (types.size() > 1)
+        if (types.size() > 1) // bug: при смене типа и возврате назад, из настроек подтягивается, но не отображается выбранным
         {
             auto index = 0;
             for (auto i = 0; i < types.size(); ++i)
@@ -245,8 +248,8 @@ public:
         }
         combo_dev_outputs.onChange = [this]
         {
-            signal.clear_data();
-            signal.extremes_clear();
+            _signal.clear_data();
+            _signal.extremes_clear();
 
             __opt->save(L"combo_dev_output", combo_dev_outputs.getText());
             auto sample_rate = __opt->get_int(L"combo_dev_rate");
@@ -279,18 +282,22 @@ public:
     //=============================================================================================
     // переопределённые методы
 
-    void releaseResources() override { }
+    void releaseResources() override {
+        DBG("releaseResources");
+    }
 
     void prepareToPlay(const int /*samples_per_block*/, const double sample_rate) override
     {
+        DBG("prepareToPlay");
         combo_buff_size.onChange();
-        signal.prepare_to_play(sample_rate);
+        _signal.prepare_to_play(sample_rate);
         component_filter.prepare_to_play(sample_rate);
+        component_graph.begin_waiting(__opt->get_int(L"buff_size"));
     }
 
     void getNextAudioBlock(const AudioSourceChannelInfo& buffer) override
     {
-        signal.next_audio_block(buffer);
+        _signal.next_audio_block(buffer);
     }
 
     void resized() override // todo: широкое окно
@@ -377,8 +384,11 @@ public:
 
     void timerCallback() override
     {
-        auto rms = signal.get_rms();
+        auto rms = _signal.get_rms();
         if (rms.size() == 0) return;
+
+        if (component_graph.is_waiting())
+            component_graph.stop_waiting();
 
         function<String(double)> print; // todo: центровать цифры по точке
 
@@ -390,19 +400,19 @@ public:
             print = prefix_v;
         }
         else {
-            rms.at(LEFT ) = signal.gain2db(rms.at(LEFT )) - signal.zero_get(LEFT );
-            rms.at(RIGHT) = signal.gain2db(rms.at(RIGHT)) - signal.zero_get(RIGHT);
+            rms.at(LEFT ) = _signal.gain2db(rms.at(LEFT )) - _signal.zero_get(LEFT );
+            rms.at(RIGHT) = _signal.gain2db(rms.at(RIGHT)) - _signal.zero_get(RIGHT);
             print = [ ](double value) { return String(value, 3) + L" dB"; };
         }
         rms.push_back(abs(rms.at(LEFT) - rms.at(RIGHT)));
-        signal.extremes_set(rms);
+        _signal.extremes_set(rms);
         component_graph.enqueue(rms);
 
         String printed[3];
         for (size_t line = LEFT; line < VOLUME_SIZE; line++)
         {
             fill_n(printed, _countof(printed), theme::empty);
-            auto extremes = signal.extremes_get(line);
+            auto extremes = _signal.extremes_get(line);
 
             if (isfinite(rms.at(line)))  printed[0] = print(rms.at(line));
             if (isfinite(extremes[MIN])) printed[1] = print(extremes[MIN]);

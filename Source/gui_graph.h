@@ -8,7 +8,8 @@ extern unique_ptr<settings_> __opt;
 //      провалы вверх при переключении фильтра
 //         ! и, соответственно, вниз при частично заполненном буфере, что происходит при переключении параметров
 
-class component_graph_ : public Component
+class component_graph_ : public Component,
+                         public Timer
 {
 protected:
     struct range_t
@@ -24,15 +25,46 @@ protected:
         high_pass,
         low_pass
     };
+    struct waiting_t
+    {
+        bool                    running        = false;
+        const int               timer_value_ms = 100;
+        float                   remain;
+        float                   interval;
+        double                  progress_value = 0;
+        unique_ptr<ProgressBar> progress_bar;
+        unique_ptr<Label>       stub_bg;
+        unique_ptr<Label>       stub_text;
+    };
 private:
     Rectangle<int>       _plot;
     Rectangle<int>       _plot_indented;
     unique_ptr<double[]> _extremes;
-    unique_ptr<circle_>  _graph_data;
+    unique_ptr<circle_>  _graph_data; // bug: очищать при смене устройства
     RectangleList<int>   _placed_extremes;
+    waiting_t            _wait;
 
 public:
-    component_graph_ () { reset(); }
+    component_graph_()
+    {
+        reset();
+
+        _wait.progress_bar = make_unique<ProgressBar>(_wait.progress_value);
+        _wait.stub_bg      = make_unique<Label>();
+        _wait.stub_text    = make_unique<Label>();
+
+        _wait.stub_bg  ->setColour(Label::backgroundColourId, Colours::white.withAlpha(0.7f));
+        _wait.stub_text->setJustificationType(Justification::centred);
+        _wait.stub_text->setFont(_wait.stub_text->getFont().boldened());
+        _wait.stub_text->setColour(Label::backgroundColourId, Colours::white);
+
+        _wait.progress_bar->setColour(ProgressBar::ColourIds::backgroundColourId, Colours::transparentBlack);
+        _wait.progress_bar->setPercentageDisplay(false);
+
+        addAndMakeVisible(_wait.stub_bg.get());
+        addAndMakeVisible(_wait.stub_text.get());
+        addAndMakeVisible(_wait.progress_bar.get());
+    }
     ~component_graph_() {          }
 
     void reset() {
@@ -51,6 +83,25 @@ public:
                 repaint(); // todo: оптимизировать
             }
         }
+    }
+
+    void begin_waiting(int milisec) {
+        _wait.remain = _wait.interval = milisec;
+        _wait.running = true;
+        _wait.stub_bg     ->setVisible(true);
+        _wait.stub_text   ->setVisible(true);
+        _wait.progress_bar->setVisible(true);
+        startTimer(_wait.timer_value_ms);
+    }
+    void stop_waiting() {
+        _wait.running = false;
+        _wait.stub_bg     ->setVisible(false);
+        _wait.stub_text   ->setVisible(false);
+        _wait.progress_bar->setVisible(false);
+        stopTimer();
+    }
+    bool is_waiting() {
+        return _wait.running;
     }
 
     // todo: иконка взаимной зависимости каналов (единое масштабирование)
@@ -212,6 +263,10 @@ public:
         g.drawDashedLine(lines[1].toFloat(), dotted_pattern, _countof(dotted_pattern));
     }
 
+    void resized() override {
+        _wait.stub_bg->setBounds(getLocalBounds());
+    }
+
     //=============================================================================================
     void paint(Graphics& g) override {
         //=========================================================================================
@@ -223,7 +278,6 @@ public:
         g.fillRect(_plot);
 
         draw_indications(g);
-        //draw_legend(g);
 
         _placed_extremes.clear();
         for (auto channel = RIGHT; channel < CHANNEL_SIZE; channel--)
@@ -238,6 +292,26 @@ public:
         }
         g.setColour(Colours::grey);
         g.drawRect(_plot);
+    }
+
+    void timerCallback() override
+    {
+        auto remain = _wait.remain > 0 ?
+            String(_wait.remain / 1000.0f, 1) + L" sec" : L"";
+        auto text = L"Waiting for the buffer to fill... " + remain;
+
+        auto text_w = _wait.stub_text->getFont().getStringWidth(text);
+        auto text_h = _wait.stub_text->getFont().getHeight();
+
+        auto rect_text = getLocalBounds().withSizeKeepingCentre(text_w, text_h);
+        _wait.stub_text->setBounds(rect_text);
+        _wait.stub_text->setText(text, dontSendNotification);
+
+        _wait.progress_bar->setBounds(rect_text.withCentre(Point<int>(rect_text.getCentreX(), rect_text.getY() + text_h + theme::margin * 2)));
+        _wait.progress_value = jmap(_wait.interval - _wait.remain, 0.0f, _wait.interval, 0.0f, 1.0f);
+
+        _wait.remain -= _wait.timer_value_ms;
+        repaint();
     }
 
 private:

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <JuceHeader.h>
 #include "signal.h"
 
@@ -124,10 +124,11 @@ public:
     void prepare_to_play(const double sample_rate)
     {
         auto max_freq = sample_rate / 2;
-        auto empty_message = "1 .. " + String(max_freq) + L" Hz";
+        auto empty_message = "1 .. " + String(max_freq, 0) + L" Hz";
         for (auto& edit : edit_freq)
         {
             edit->setTextToShowWhenEmpty(empty_message, Colours::grey);
+            edit->repaint();
             auto value = edit->getText().getIntValue();
             if (value > max_freq)
                 edit->setText(String(max_freq), true);

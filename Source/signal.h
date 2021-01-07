@@ -341,7 +341,7 @@ public:
         _sin.reset();
 
         filter_init(HIGH_PASS);
-        filter_init(LOW_PASS);
+        filter_init(LOW_PASS );
     }
 
     void next_audio_block(const AudioSourceChannelInfo& buffer)
