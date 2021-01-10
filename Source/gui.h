@@ -20,8 +20,6 @@ class main_component_ : public AudioAppComponent,
 {
 protected:
     signal_                    _signal;
-    const vector<float>        _buff_size_list   { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f, 30.0f };
-    const vector<int>          _tone_list        { 10, 20, 200, 500, 1000, 2000, 5000, 10000, 20000 };
 private:
     Label                      label_device_type { { }, L"Type"        },
                                label_device      { { }, L"Device"      },
@@ -53,7 +51,7 @@ public:
         addAndMakeVisible(combo_tone);
 
         label_buff_size.attachToComponent(&combo_buff_size, true);
-        for (const auto item : _buff_size_list)
+        for (const auto item : __buff_size_list_sec)
             combo_buff_size.addItem(prefix(item, L"s", 0), static_cast<int>(item * 1000));
 
         combo_buff_size.setSelectedId(__opt->get_int(L"combo_buff_size"));
@@ -62,7 +60,7 @@ public:
             auto value = combo_buff_size.getSelectedId();
             _signal.change_buff_size(value);
             __opt->save(L"combo_buff_size", value);
-            component_graph.begin_waiting(value);
+            component_graph.start_waiting(buffer_fill, value);
         };
 
         checkbox_tone.setToggleState(__opt->get_int(L"checkbox_tone"), dontSendNotification);
@@ -72,7 +70,7 @@ public:
             _signal.extremes_clear();
             __opt->save(L"checkbox_tone", checkbox_tone.getToggleState());
         };
-        for (const auto item : _tone_list)
+        for (const auto item : __tone_list)
             combo_tone.addItem(prefix(item, L"Hz", 0), item);
 
         combo_tone.setSelectedId(__opt->get_int(L"combo_tone"));
@@ -283,16 +281,15 @@ public:
     // переопределённые методы
 
     void releaseResources() override {
-        DBG("releaseResources");
+
     }
 
     void prepareToPlay(const int /*samples_per_block*/, const double sample_rate) override
     {
-        DBG("prepareToPlay");
         combo_buff_size.onChange();
         _signal.prepare_to_play(sample_rate);
         component_filter.prepare_to_play(sample_rate);
-        component_graph.begin_waiting(__opt->get_int(L"buff_size"));
+        component_graph.start_waiting(buffer_fill, __opt->get_int(L"buff_size"));
     }
 
     void getNextAudioBlock(const AudioSourceChannelInfo& buffer) override

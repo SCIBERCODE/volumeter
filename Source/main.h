@@ -9,6 +9,9 @@
 const auto MF_PI   = static_cast<float>(M_PI);
 const auto MF_PI_2 = static_cast<float>(M_PI_2);
 
+const vector<float>    __buff_size_list_sec { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f, 30.0f };
+const vector<int>      __tone_list          { 10, 20, 200, 500, 1000, 2000, 5000, 10000, 20000 };
+
 const map<int, String> __prefs {
     { -15, L"f"      },
     { -12, L"p"      },

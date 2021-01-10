@@ -4,8 +4,12 @@
 
 extern unique_ptr<settings_> __opt;
 
-// bug: начинать график с устоявшихся значений
-//      провалы вверх при переключении фильтра
+enum waiting_event_t {
+    device_init,
+    buffer_fill
+};
+
+// bug: провалы вверх при переключении фильтра
 //         ! и, соответственно, вниз при частично заполненном буфере, что происходит при переключении параметров
 
 class component_graph_ : public Component,
@@ -28,13 +32,14 @@ protected:
     struct waiting_t
     {
         bool                    running        = false;
-        const int               timer_value_ms = 100;
-        float                   remain;
-        float                   interval;
-        double                  progress_value = 0;
+        const size_t            timer_value_ms = 100;   // интервал обновления на экране и одновременного декремента остатка таймера
+        size_t                  remain_ms;              // декремент остатка
+        size_t                  interval_ms;            // полное время ожидания
+        double                  progress_value = -1.0;  // переменная в диапазоне 0.0 .. 1.0, отслеживаемая ProgressBar контролом
         unique_ptr<ProgressBar> progress_bar;
-        unique_ptr<Label>       stub_bg;
+        unique_ptr<Label>       stub_bg;                // полупрозрачная заливка
         unique_ptr<Label>       stub_text;
+        waiting_event_t         event;
     };
 private:
     Rectangle<int>       _plot;
@@ -57,6 +62,7 @@ public:
         _wait.stub_text->setJustificationType(Justification::centred);
         _wait.stub_text->setFont(_wait.stub_text->getFont().boldened());
         _wait.stub_text->setColour(Label::backgroundColourId, Colours::white);
+        _wait.stub_text->setText(get_timer_text(device_init), dontSendNotification);
 
         _wait.progress_bar->setColour(ProgressBar::ColourIds::backgroundColourId, Colours::transparentBlack);
         _wait.progress_bar->setPercentageDisplay(false);
@@ -65,7 +71,7 @@ public:
         addAndMakeVisible(_wait.stub_text.get());
         addAndMakeVisible(_wait.progress_bar.get());
     }
-    ~component_graph_() {          }
+    ~component_graph_() { }
 
     void reset() {
         auto display_width = 0;
@@ -85,16 +91,19 @@ public:
         }
     }
 
-    void begin_waiting(int milisec) {
-        _wait.remain = _wait.interval = milisec;
-        _wait.running = true;
+    void start_waiting(waiting_event_t event, size_t milisec = 0) {
+        _wait.remain_ms   = milisec;
+        _wait.interval_ms = milisec;
+        _wait.running     = true;
+        _wait.event       = event;
         _wait.stub_bg     ->setVisible(true);
         _wait.stub_text   ->setVisible(true);
         _wait.progress_bar->setVisible(true);
+        resized();
         startTimer(_wait.timer_value_ms);
     }
     void stop_waiting() {
-        _wait.running = false;
+        _wait.running     = false;
         _wait.stub_bg     ->setVisible(false);
         _wait.stub_text   ->setVisible(false);
         _wait.progress_bar->setVisible(false);
@@ -263,8 +272,32 @@ public:
         g.drawDashedLine(lines[1].toFloat(), dotted_pattern, _countof(dotted_pattern));
     }
 
+    String get_timer_text(waiting_event_t event) {
+        if (event == buffer_fill)
+        {
+            auto remain = _wait.remain_ms >= _wait.timer_value_ms ?
+                String(_wait.remain_ms / 1000.0f, 1) + L" sec" : L"";
+            return L"Waiting for the buffer to fill... " + remain;
+        }
+        if (event == device_init)
+        {
+            return L"Device initialization...";
+        }
+        return "";
+    }
+
+    //=============================================================================================
     void resized() override {
-        _wait.stub_bg->setBounds(getLocalBounds());
+        //=========================================================================================
+        auto area         = getLocalBounds();
+        auto text         = get_timer_text(_wait.event); // максимальной шириной считаем первую по порядку строку
+        auto text_w       = _wait.stub_text->getFont().getStringWidth(text);
+        auto text_h       = roundToInt(_wait.stub_text->getFont().getHeight());
+        auto area_text    = area.withSizeKeepingCentre(text_w, text_h);
+
+        _wait.stub_bg     ->setBounds(area);
+        _wait.stub_text   ->setBounds(area_text);
+        _wait.progress_bar->setBounds(area_text.withCentre(Point<int>(area_text.getCentreX(), area_text.getY() + text_h + theme::margin * 2)));
     }
 
     //=============================================================================================
@@ -294,23 +327,22 @@ public:
         g.drawRect(_plot);
     }
 
+    //=============================================================================================
     void timerCallback() override
+        //=========================================================================================
     {
-        auto remain = _wait.remain > 0 ?
-            String(_wait.remain / 1000.0f, 1) + L" sec" : L"";
-        auto text = L"Waiting for the buffer to fill... " + remain;
+        _wait.stub_text->setText(get_timer_text(_wait.event), dontSendNotification);
+        if (_wait.remain_ms >= _wait.timer_value_ms)
+        {
+            _wait.remain_ms -= _wait.timer_value_ms;
+            _wait.progress_value = jmap(
+                static_cast<double>(_wait.interval_ms - _wait.remain_ms),
+                0.0, static_cast<double>(_wait.interval_ms),
+                0.0, 1.0);
+        }
+        else
+            _wait.progress_value = -1.0;
 
-        auto text_w = _wait.stub_text->getFont().getStringWidth(text);
-        auto text_h = _wait.stub_text->getFont().getHeight();
-
-        auto rect_text = getLocalBounds().withSizeKeepingCentre(text_w, text_h);
-        _wait.stub_text->setBounds(rect_text);
-        _wait.stub_text->setText(text, dontSendNotification);
-
-        _wait.progress_bar->setBounds(rect_text.withCentre(Point<int>(rect_text.getCentreX(), rect_text.getY() + text_h + theme::margin * 2)));
-        _wait.progress_value = jmap(_wait.interval - _wait.remain, 0.0f, _wait.interval, 0.0f, 1.0f);
-
-        _wait.remain -= _wait.timer_value_ms;
         repaint();
     }
 
