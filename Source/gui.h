@@ -5,7 +5,8 @@
 #include "gui_calibration.h"
 #include "gui_graph.h"
 
-extern std::unique_ptr<settings_> __opt;
+extern std::unique_ptr<settings_>    __opt;
+extern std::function<String(double)> __print;
 
 using controls_t = std::variant<std::shared_ptr<Label>, std::shared_ptr<ToggleButton>>;
 
@@ -31,7 +32,7 @@ private:
     component_filter_          component_filter;
     component_graph_           component_graph;
     theme::checkbox_left_tick_ theme_left_tick; // должно быть объявлено раньше stat_controls
-    TextButton                 button_zero, button_stat_reset, button_pause_graph;
+    TextButton                 button_stat_reset, button_pause_graph, button_zero;
     ComboBox                   combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
     controls_t                 stat_controls[VOLUME_SIZE][LABELS_STAT_COLUMN_SIZE];
 
@@ -135,16 +136,34 @@ public:
                 }
         }
 
-        addAndMakeVisible(button_zero);
         addAndMakeVisible(button_stat_reset);
         addAndMakeVisible(button_pause_graph);
+        addAndMakeVisible(button_zero);
 
-        button_stat_reset.setButtonText (L"Reset stat" );
-        button_zero.setButtonText       (L"Set zero"   );
+        button_stat_reset .setConnectedEdges(ToggleButton::ConnectedOnRight);
+        button_pause_graph.setConnectedEdges(ToggleButton::ConnectedOnRight | ToggleButton::ConnectedOnLeft);
+        button_zero       .setConnectedEdges(                                 ToggleButton::ConnectedOnLeft);
+
+        button_stat_reset .setButtonText(L"Reset stat" );
         button_pause_graph.setButtonText(L"Pause graph");
+        button_zero       .setButtonText(L"Set zero"   );
 
         button_pause_graph.setClickingTogglesState(true);
         button_zero.setClickingTogglesState(true);
+
+        button_stat_reset.onClick = [this]
+        {
+            _signal.extremes_clear();
+            component_graph.reset();
+        };
+
+        button_pause_graph.setToggleState(__opt->get_int(L"button_pause_graph"), dontSendNotification);
+        button_pause_graph.onClick = [this]
+        {
+            auto value = button_pause_graph.getToggleState();
+            button_pause_graph.setButtonText(value ? L"Resume graph" : L"Pause graph");
+            __opt->save(L"button_pause_graph", value);
+        };
 
         button_zero.onClick = [this]
         {
@@ -162,20 +181,6 @@ public:
                 __opt->get_text(L"zero_value_right").getDoubleValue()
             );
         }
-
-        button_pause_graph.setToggleState(__opt->get_int(L"button_pause_graph"), dontSendNotification);
-        button_pause_graph.onClick = [this]
-        {
-            auto value = button_pause_graph.getToggleState();
-            button_pause_graph.setButtonText(value ? L"Resume graph" : L"Pause graph");
-            __opt->save(L"button_pause_graph", value);
-        };
-
-        button_stat_reset.onClick = [this]
-        {
-            _signal.extremes_clear();
-            component_graph.reset();
-        };
 
         addAndMakeVisible(component_graph);
         addAndMakeVisible(component_filter);
@@ -385,23 +390,23 @@ public:
         if (component_graph.is_waiting())
             component_graph.stop_waiting();
 
-        std::function<String(double)> print; // todo: центровать цифры по точке
+        component_graph.enqueue(LEFT,  rms.at(LEFT ));
+        component_graph.enqueue(RIGHT, rms.at(RIGHT));
 
         auto calibrate = component_calibration.is_active();
         if (calibrate)
         {
             rms.at(LEFT ) *= component_calibration.get_coeff(LEFT ); // bug: при неучтённом префиксе
             rms.at(RIGHT) *= component_calibration.get_coeff(RIGHT);
-            print = prefix_v;
+            __print = prefix_v;
         }
         else {
             rms.at(LEFT ) = _signal.gain2db(rms.at(LEFT )) - _signal.zero_get(LEFT );
             rms.at(RIGHT) = _signal.gain2db(rms.at(RIGHT)) - _signal.zero_get(RIGHT);
-            print = [ ](double value) { return String(value, 3) + L" dB"; };
+            __print = [ ](double value) { return String(value, 3) + L" dB"; };
         }
         rms.push_back(abs(rms.at(LEFT) - rms.at(RIGHT)));
         _signal.extremes_set(rms);
-        component_graph.enqueue(rms);
 
         String printed[3];
         for (size_t line = LEFT; line < VOLUME_SIZE; line++)
@@ -409,9 +414,9 @@ public:
             std::fill_n(printed, _countof(printed), theme::empty);
             auto extremes = _signal.extremes_get(line);
 
-            if (isfinite(rms.at(line)))  printed[0] = print(rms.at(line));
-            if (isfinite(extremes[MIN])) printed[1] = print(extremes[MIN]);
-            if (isfinite(extremes[MAX])) printed[2] = print(extremes[MAX]);
+            if (isfinite(rms.at(line)))  printed[0] = __print(rms.at(line));
+            if (isfinite(extremes[MIN])) printed[1] = __print(extremes[MIN]);
+            if (isfinite(extremes[MAX])) printed[2] = __print(extremes[MAX]);
 
             if (auto label = __get<Label>(stat_controls[line][VALUE])) {
                 label->setText(printed[0], dontSendNotification);
@@ -421,7 +426,8 @@ public:
                 label->setText(printed[1] + L" .. " + printed[2], dontSendNotification);
         }
 
-        if (button_zero.isEnabled() == calibrate) { // todo: логику без этого
+        if (button_zero.isEnabled() == calibrate) {
+            // todo: ноль на вольтах
             button_zero.setToggleState(false, sendNotificationSync);
             button_zero.setEnabled(!calibrate);
         }

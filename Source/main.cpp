@@ -5,6 +5,8 @@
 
 std::unique_ptr<settings_>     __opt;
 std::unique_ptr<theme::light_> __theme;
+std::function<String(double)>  __print; // todo: центровать цифры по точке
+
 
 application_::application_() {
     __opt   = std::make_unique<settings_>();

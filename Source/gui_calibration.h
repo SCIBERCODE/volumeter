@@ -98,6 +98,7 @@ public:
             __opt->save(L"combo_prefix", combo_prefix.getSelectedId() - 1);
         };
 
+        button_cal_add.setConnectedEdges(ToggleButton::ConnectedOnLeft);
         button_cal_add.setButtonText(L"Add");
         button_cal_add.onClick = [=]
         {
@@ -137,8 +138,7 @@ public:
     void update()
     {
         rows.clear();
-        auto cals = __opt->get_xml(L"calibrations");
-        if (cals != nullptr) {
+        if (auto cals = __opt->get_xml(L"calibrations")) {
             forEachXmlChildElement(*cals, el)
             {
                 rows.push_back(cal_t{

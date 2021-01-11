@@ -8,6 +8,14 @@ using namespace spuce;
 
 extern std::unique_ptr<settings_> __opt;
 
+struct value_t
+{
+    double   value_raw;
+    //float    value_db;
+    //double   zero;
+    uint64_t index;
+};
+
 //=================================================================================================
 class sin_ {
 //=================================================================================================
@@ -47,7 +55,8 @@ public:
     }
 };
 
-//=================================================================================================
+/** круговой буфер
+*/
 class circle_ {
 //=================================================================================================
 protected:
@@ -56,11 +65,8 @@ protected:
         size_t    size;
         size_t    pointer;
         channel_t channel;
-    };
-    struct value_t
-    {
-        double   value;
-        uint64_t index;
+        double    coeff;
+        double    zero;
     };
 private:
     std::unique_ptr<value_t[]> _buffers[CHANNEL_SIZE];
@@ -69,6 +75,7 @@ private:
     iterator_t                 _it;
     uint64_t                   _index;
     bool                       _full; // как минимум единажды буфер был заполнен
+    bool                       _volts;
 public:
     circle_(const size_t max_size) :
         _max_size(max_size), _index(0), _full(false)
@@ -85,15 +92,15 @@ public:
             if (_buffers[line])
                 for (size_t k = 0; k < _max_size; k++)
                 {
-                    _buffers[line][k].value = std::numeric_limits<double>::quiet_NaN();
-                    _buffers[line][k].index = 0;
+                    _buffers[line][k].value_raw = std::numeric_limits<double>::quiet_NaN();
+                    _buffers[line][k].index     = 0;
                 }
 
             _tails[line] = 0;
         }
     }
 
-    void enqueue(const channel_t channel, const float value)
+    void enqueue(const channel_t channel, const double value)
     {
         if (_max_size && isfinite(value) && _buffers[channel])
         {
@@ -103,17 +110,16 @@ public:
             if (_tails[channel] == 0)
                 _full = true;
 
-            new_value.value = value;
-            new_value.index = _index++;
+            new_value.value_raw = value;
+            new_value.index     = _index++;
         }
     }
 
-    auto is_full() const {
-        return _full;
-    }
+    auto is_full () const { return _full;  }
+    auto is_volts() const { return _volts; }
 
     auto get_tail(const channel_t channel) const {
-        return _buffers[channel][_tails[channel]].value;
+        return _buffers[channel][_tails[channel]].value_raw;
     }
 
     bool get_rms(std::array<double, VOLUME_SIZE>& rms) const
@@ -125,8 +131,8 @@ public:
             for (size_t k = 0; k < _max_size; ++k)
             {
                 auto value = _buffers[channel][k];
-                if (isfinite(value.value)) {
-                    sum [channel] += value.value;
+                if (isfinite(value.value_raw)) {
+                    sum [channel] += value.value_raw;
                     size[channel]++;
                 }
             }
@@ -144,24 +150,54 @@ public:
     /** начало цикла извлечения значений буфера, в дальнейшем вызывается circle_::get_next_value
         @param index уникальный идентификатор значения в буфере
     */
-    bool get_first_value(const channel_t channel, const size_t size, double& value, uint64_t* index = nullptr) {
+    bool get_first_value(const channel_t channel, const size_t size, double& value) {
         if (size == 0 || size > _max_size || _tails[channel] == 0)/* bug: исправить логику */
             return false;
 
         _it.pointer = _tails[channel] - 1;
         _it.size    = size;
         _it.channel = channel;
-        return get_next_value(value, index);
+
+        _it.coeff   = std::numeric_limits<double>::quiet_NaN();
+        _it.zero    = std::numeric_limits<double>::quiet_NaN();
+
+        size_t cal_index = __opt->get_int(L"calibrations_index");
+        if (cal_index != -1 && __opt->get_int(L"calibrate"))
+        {
+            size_t k = 0;
+            if (auto cals = __opt->get_xml(L"calibrations")) {
+                forEachXmlChildElement(*cals, el)
+                {
+                    if (k == cal_index) {
+                        if (_it.channel == LEFT)
+                            _it.coeff = el->getDoubleAttribute(Identifier(L"left_coeff"));
+                        else
+                            _it.coeff = el->getDoubleAttribute(Identifier(L"right_coeff"));
+                        break;
+                    }
+                    k++;
+                }
+            }
+        }
+
+        if (__opt->get_int(L"zero"))
+            if (_it.channel == LEFT)
+                _it.zero = __opt->get_text(L"zero_value_left").getDoubleValue();
+            else
+                _it.zero = __opt->get_text(L"zero_value_right").getDoubleValue();
+
+        _volts = isfinite(_it.coeff);
+        return get_next_value(value);
     }
 
     /** извлечение значений буфера
         @return о завершении сообщается возвратом false
     */
-    bool get_next_value(double& value, uint64_t* index = nullptr) {
+    bool get_next_value(double& value) {
         value_t result;
 
-        result.value = std::numeric_limits<double>::quiet_NaN();
-        result.index = 0;
+        result.value_raw = std::numeric_limits<double>::quiet_NaN();
+        result.index     = 0;
 
         if (_it.pointer >= 0 && _it.size)
         {
@@ -173,15 +209,20 @@ public:
 
             _it.size--;
         };
-        if (!isfinite(result.value))
+        if (!isfinite(result.value_raw))
             _it = { };
-        else
-        {
-            value = result.value;
-            if (index) *index = result.index;
+        else {
+            // bug: не менять данные графика, всю работу производить в get_extremes
+            if (isfinite(_it.coeff))
+                value = result.value_raw * _it.coeff;
+            else {
+                value = 20 * log10(result.value_raw);
+                if (isfinite(_it.zero))
+                    value -= _it.zero; // bug: подскакивает граф, не норм
+            }
         }
 
-        return isfinite(result.value);
+        return isfinite(result.value_raw);
     }
 
     auto get_extremes(const channel_t channel, const size_t size) {
@@ -190,7 +231,7 @@ public:
 
         if (get_first_value(channel, size, value)) {
             result[MIN] = value;
-            result[MAX] = value + 0.00001f; // todo: избавиться
+            result[MAX] = value;
             do {
                 if (!isfinite(value)) break;
                 result[MIN] = std::min(value, result[MIN]);
@@ -278,7 +319,7 @@ public:
                 column = std::numeric_limits<double>::quiet_NaN();
     }
 
-    double gain2db(const double gain) const {
+    static double gain2db(const double gain) {
         return 20 * log10(gain);
     }
     void set_freq(const double freq) {

@@ -2,7 +2,8 @@
 #include <JuceHeader.h>
 #include "signal.h"
 
-extern std::unique_ptr<settings_> __opt;
+extern std::unique_ptr<settings_>    __opt;
+extern std::function<String(double)> __print;
 
 enum waiting_event_t
 {
@@ -81,12 +82,13 @@ public:
         _graph_data = std::make_unique<circle_>(display_width);
     }
 
-    void enqueue(const std::vector<double>& rms) {
+    void enqueue(const channel_t channel, const double value_raw) {
         if (__opt->get_int(L"graph_paused") == 0) {
-            if (isfinite(rms.at(LEFT))) {
-                _graph_data->enqueue(LEFT,  static_cast<float>(rms.at(LEFT )));
-                _graph_data->enqueue(RIGHT, static_cast<float>(rms.at(RIGHT)));
-                repaint(); // todo: оптимизировать
+            if (isfinite(value_raw)) {
+                _graph_data->enqueue(channel, value_raw);
+
+                if (channel == RIGHT)
+                    repaint(); // todo: оптимизировать
             }
         }
     }
@@ -106,6 +108,7 @@ public:
         _wait.running     = false;
         _wait.stub_bg     ->setVisible(false);
         _wait.stub_text   ->setVisible(false);
+        _wait.stub_text   ->setText(get_timer_text(device_init), dontSendNotification);
         _wait.progress_bar->setVisible(false);
         stopTimer();
     }
@@ -132,8 +135,8 @@ public:
         for ( ; ; offset++)
         {
             if (!isfinite(value)) break;
-            auto  x = _plot.getRight() - offset;
-            auto y = static_cast<float>(-value * (_plot_indented.getHeight() / abs(_extremes[MIN] - _extremes[MAX])));
+            auto x = _plot.getRight() - offset;
+            auto y = static_cast<float>(-value);// *(_plot_indented.getHeight() / abs(_extremes[MIN] - _extremes[MAX])));
             if (path.isEmpty())
                 path.startNewSubPath(x, y);
 
@@ -186,14 +189,27 @@ public:
             if (!_graph_data->get_first_value(channel, _plot.getWidth(), value))
                 continue;
 
+            auto volts = _graph_data->is_volts();
+            String text[2];
+
             for ( ; ; offset++)
             {
-                //if (round_flt(value) == round_flt(extremes.at(MAX)))
-                //if (is_about_equal(value, extremes.at(MAX)))
-                if (String(value, 3) == String(_extremes[extremum], 3)) // todo: индостан
+                //if (round_flt(value) == round_flt(_extremes[extremum]))
+                //if (is_about_equal(value, _extremes[extremum]))
+
+                // todo: ! избавиться от индусского кода
+                if (volts) {
+                    text[0] = prefix(value, L"V", 3);
+                    text[1] = prefix(_extremes[extremum], L"V", 3);
+                }
+                else {
+                    text[0] = String(value, 3) + L" dB";
+                    text[1] = String(_extremes[extremum], 3) + L" dB";
+                }
+
+                if (text[0] == text[1])
                 {
-                    const auto text = String(value, 3) + L" dB";
-                    const auto text_width = g.getCurrentFont().getStringWidth(text);
+                    const auto text_width = g.getCurrentFont().getStringWidth(text[0]);
                     Rectangle<int> rect
                     (
                         _plot.getRight() - offset - (text_width / 2),
@@ -215,7 +231,7 @@ public:
                         g.setColour(Colours::white);
                         g.fillRect(rect);
                         g.setColour(channel == LEFT ? Colours::black : Colours::green);
-                        g.drawText(text, rect, Justification::centred, false);
+                        g.drawText(text[0], rect, Justification::centred, false);
                     }
                     if (channel == RIGHT)
                         _placed_extremes.add(rect);
@@ -331,7 +347,7 @@ public:
     void timerCallback() override {
         //=========================================================================================
         _wait.stub_text->setText(get_timer_text(_wait.event), dontSendNotification);
-        if (_wait.remain_ms >= _wait.timer_value_ms)
+        if (_wait.remain_ms >= _wait.timer_value_ms) // bug: на бОльших частотах дискретизации
         {
             _wait.remain_ms -= _wait.timer_value_ms;
             _wait.progress_value = jmap(
