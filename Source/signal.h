@@ -1,12 +1,3 @@
-#pragma once
-#include <JuceHeader.h>
-#include <spuce/filters/iir.h>
-#include <spuce/filters/butterworth_iir.h>
-#include "main.h"
-
-using namespace spuce;
-
-extern std::unique_ptr<settings_> __opt;
 
 struct value_t
 {
@@ -76,9 +67,10 @@ private:
     uint64_t                   _index;
     bool                       _full; // как минимум единажды буфер был заполнен
     bool                       _volts;
+    application_             & _app;
 public:
-    circle_(const size_t max_size) :
-        _max_size(max_size), _index(0), _full(false)
+    circle_(application_& app, const size_t max_size) :
+        _app(app), _max_size(max_size), _index(0), _full(false)
     {
         for (auto& buffer : _buffers)
             buffer = std::make_unique<value_t[]>(_max_size);
@@ -161,11 +153,11 @@ public:
         _it.coeff   = std::numeric_limits<double>::quiet_NaN();
         _it.zero    = std::numeric_limits<double>::quiet_NaN();
 
-        size_t cal_index = __opt->get_int(L"calibrations_index");
-        if (cal_index != -1 && __opt->get_int(L"calibrate"))
+        size_t cal_index = _app.get_int(L"calibrations_index");
+        if (cal_index != -1 && _app.get_int(L"calibrate"))
         {
             size_t k = 0;
-            if (auto cals = __opt->get_xml(L"calibrations")) {
+            if (auto cals = _app.get_xml(L"calibrations")) {
                 forEachXmlChildElement(*cals, el)
                 {
                     if (k == cal_index) {
@@ -180,11 +172,11 @@ public:
             }
         }
 
-        if (__opt->get_int(L"zero"))
+        if (_app.get_int(L"zero"))
             if (_it.channel == LEFT)
-                _it.zero = __opt->get_text(L"zero_value_left").getDoubleValue();
+                _it.zero = _app.get_text(L"zero_value_left").getDoubleValue();
             else
-                _it.zero = __opt->get_text(L"zero_value_right").getDoubleValue();
+                _it.zero = _app.get_text(L"zero_value_right").getDoubleValue();
 
         _volts = isfinite(_it.coeff);
         return get_next_value(value);
@@ -255,18 +247,19 @@ private:
     std::mutex               _locker;
     sin_                     _sin;
     std::unique_ptr<circle_> _buff;
-    std::unique_ptr<iir<float_type, float_type>>
+    std::unique_ptr<spuce::iir<spuce::float_type, spuce::float_type>>
                              _filters [CHANNEL_SIZE][FILTER_TYPE_SIZE];
     size_t                   _orders                [FILTER_TYPE_SIZE];
     double                   _extremes[VOLUME_SIZE ][EXTREMES_SIZE   ];
     double                   _zeros   [CHANNEL_SIZE];
+    application_           & _app;
 public:
 
-    signal_()
+    signal_(application_& app) : _app(app)
     {
-        _sample_rate       = __opt->get_int(L"sample_rate"    );
-        _orders[HIGH_PASS] = __opt->get_int(L"pass_high_order");
-        _orders[LOW_PASS ] = __opt->get_int(L"pass_low_order" );
+        _sample_rate       = _app.get_int(L"sample_rate"    );
+        _orders[HIGH_PASS] = _app.get_int(L"pass_high_order");
+        _orders[LOW_PASS ] = _app.get_int(L"pass_low_order" );
 
         zero_clear();
     }
@@ -286,8 +279,8 @@ public:
             {
                 _zeros[LEFT ] = gain2db(rms[LEFT ]);
                 _zeros[RIGHT] = gain2db(rms[RIGHT]);
-                __opt->save(L"zero_value_left",  _zeros[LEFT ]);
-                __opt->save(L"zero_value_right", _zeros[RIGHT]);
+                _app.save(L"zero_value_left",  _zeros[LEFT ]);
+                _app.save(L"zero_value_right", _zeros[RIGHT]);
             }
         }
         extremes_clear();
@@ -330,7 +323,7 @@ public:
         std::lock_guard<std::mutex> locker(_locker);
         if (new_size && _sample_rate) {
             auto number_of_samples = static_cast<size_t>(new_size / (1000.0 / _sample_rate));
-            _buff = std::make_unique<circle_>(number_of_samples);
+            _buff = std::make_unique<circle_>(_app, number_of_samples);
         }
     }
     void clear_data() {
@@ -357,15 +350,15 @@ public:
         {
             if (filter_type == HIGH_PASS)
             {
-                iir_coeff high_pass(_orders[filter_type], filter_type::high);
-                butterworth_iir(high_pass, __opt->get_int(L"pass_high_freq") / _sample_rate, 3.0);
-                _filters[channel][HIGH_PASS] = std::make_unique<iir<float_type, float_type>>(high_pass);
+                spuce::iir_coeff high_pass(_orders[filter_type], spuce::filter_type::high);
+                butterworth_iir(high_pass, _app.get_int(L"pass_high_freq") / _sample_rate, 3.0);
+                _filters[channel][HIGH_PASS] = std::make_unique<spuce::iir<spuce::float_type, spuce::float_type>>(high_pass);
             }
             if (filter_type == LOW_PASS)
             {
-                iir_coeff low_pass(_orders[filter_type], filter_type::low);
-                butterworth_iir(low_pass, __opt->get_int(L"pass_low_freq") / _sample_rate, 3.0);
-                _filters[channel][LOW_PASS] = std::make_unique<iir<float_type, float_type>>(low_pass);
+                spuce::iir_coeff low_pass(_orders[filter_type], spuce::filter_type::low);
+                butterworth_iir(low_pass, _app.get_int(L"pass_low_freq") / _sample_rate, 3.0);
+                _filters[channel][LOW_PASS] = std::make_unique<spuce::iir<spuce::float_type, spuce::float_type>>(low_pass);
             }
         }
     };
@@ -375,7 +368,7 @@ public:
         _sample_rate = sample_rate;
 
         _sin.set_sample_rate(_sample_rate);
-        _sin.set_freq(static_cast<float>(__opt->get_int(L"tone_value")));
+        _sin.set_freq(static_cast<float>(_app.get_int(L"tone_value")));
         _sin.reset();
 
         filter_init(HIGH_PASS);
@@ -390,9 +383,9 @@ public:
             {
                 auto read          = buffer.buffer->getArrayOfReadPointers();
                 auto write         = buffer.buffer->getArrayOfWritePointers();
-                auto use_high_pass = __opt->get_int(L"pass_high") && _filters[LEFT][HIGH_PASS] && _filters[RIGHT][HIGH_PASS];
-                auto use_low_pass  = __opt->get_int(L"pass_low" ) && _filters[LEFT][LOW_PASS ] && _filters[RIGHT][LOW_PASS ];
-                auto use_tone      = __opt->get_int(L"tone"); // todo: ускорить работу в этой процедуре
+                auto use_high_pass = _app.get_int(L"pass_high") && _filters[LEFT][HIGH_PASS] && _filters[RIGHT][HIGH_PASS];
+                auto use_low_pass  = _app.get_int(L"pass_low" ) && _filters[LEFT][LOW_PASS ] && _filters[RIGHT][LOW_PASS ];
+                auto use_tone      = _app.get_int(L"tone"); // todo: ускорить работу в этой процедуре
 
                 for (auto channel = LEFT; channel <= RIGHT; channel++)
                     for (auto sample_index = 0; sample_index < buffer.numSamples; ++sample_index)
@@ -400,7 +393,7 @@ public:
                         _buff->enqueue(channel, read[channel][sample_index] * read[channel][sample_index]);
                         if (use_high_pass || use_low_pass || use_tone)
                         {
-                            float_type sample = use_tone ? _sin.sample(channel) : read[channel][sample_index];
+                            spuce::float_type sample = use_tone ? _sin.sample(channel) : read[channel][sample_index];
                             if (use_high_pass) sample = _filters[channel][HIGH_PASS]->clock(sample);
                             if (use_low_pass)  sample = _filters[channel][LOW_PASS ]->clock(sample);
                             write[channel][sample_index] = static_cast<float>(sample);
@@ -416,5 +409,5 @@ public:
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(signal_)
-
 };
+

@@ -1,9 +1,3 @@
-#pragma once
-#include <JuceHeader.h>
-#include "signal.h"
-
-extern std::unique_ptr<settings_>     __opt;
-extern std::unique_ptr<theme::light_> __theme;
 
 const int __order_list[] { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
 
@@ -18,7 +12,6 @@ const std::pair<const wchar_t *, const wchar_t *> __type_text[FILTER_TYPE_SIZE]
 class component_filter_ : public Component {
 //=================================================================================================
 private:
-    signal_                        & signal;
     theme::checkbox_right_tick_      theme_right;
     GroupComponent                   group        { { }, L"Filter(s)" };
     std::unique_ptr<ToggleButton>    checkbox_type[FILTER_TYPE_SIZE];
@@ -26,9 +19,11 @@ private:
     std::unique_ptr<TextEditor>      edit_freq    [FILTER_TYPE_SIZE];
     std::unique_ptr<ComboBox>        combo_order  [FILTER_TYPE_SIZE];
 
+    signal_                        & _signal;
+    application_                   & _app;
 public:
 
-    component_filter_(signal_& signal) : signal(signal)
+    component_filter_(application_& app, signal_& signal) : _signal(signal), _app(app)
     // todo: component_filter_(shared_ptr<signal_> signal) : signal(move(signal))
     {
         addAndMakeVisible(group);
@@ -53,11 +48,11 @@ public:
             addAndMakeVisible(combo);
 
             // галка включения фильтра
-            button->setToggleState(__opt->get_int(option), dontSendNotification);
+            button->setToggleState(_app.get_int(option), dontSendNotification);
             button->setLookAndFeel(&theme_right);
             button->onClick = [&, type, option]
             {
-                __opt->save(option, checkbox_type[type]->getToggleState());
+                _app.save(option, checkbox_type[type]->getToggleState());
                 signal.filter_init(type);
             };
             // поле для ввода частоты
@@ -67,7 +62,7 @@ public:
             auto check_input = [&](ToggleButton *check, String value_str)
             {
                 auto value_int = value_str.getIntValue();
-                auto enabled = value_int > 0 && value_int <= __opt->get_int(L"sample_rate") / 2;
+                auto enabled = value_int > 0 && value_int <= _app.get_int(L"sample_rate") / 2;
                 check->setEnabled(enabled);
                 if (!enabled) check->setToggleState(false, sendNotification);
                 return enabled;
@@ -77,13 +72,13 @@ public:
             {
                 auto value = edit_freq[type]->getText();
                 if (check_input(checkbox_type[type].get(), value) || value.isEmpty()) {
-                    __opt->save(option + L"_freq", value);
+                    _app.save(option + L"_freq", value);
                     signal.filter_init(type);
                 }
             };
 
             edit->setInputRestrictions(0, L"0123456789.");
-            auto value = __opt->get_text(option + L"_freq");
+            auto value = _app.get_text(option + L"_freq");
             if (check_input(button, value))
                 edit->setText(value, true);
 
@@ -91,11 +86,11 @@ public:
             for (auto const item : __order_list)
                 combo->addItem(String(item), item);
 
-            combo->setSelectedId(__opt->get_int(option + L"_order"), dontSendNotification);
+            combo->setSelectedId(_app.get_int(option + L"_order"), dontSendNotification);
             combo->onChange = [&, type, option]
             {
                 auto value = combo_order[type]->getSelectedId();
-                __opt->save(option + L"_order", value);
+                _app.save(option + L"_order", value);
                 signal.set_order(type, value);
                 signal.filter_init(type);
             };
@@ -138,5 +133,5 @@ public:
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(component_filter_)
-
 };
+

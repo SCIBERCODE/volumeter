@@ -1,5 +1,6 @@
-#pragma once
-#include <JuceHeader.h>
+
+const auto MF_PI   = static_cast<float>(M_PI);
+const auto MF_PI_2 = static_cast<float>(M_PI_2);
 
 namespace theme
 {
@@ -205,3 +206,4 @@ namespace theme
         }
     };
  }
+

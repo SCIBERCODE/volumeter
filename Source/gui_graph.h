@@ -1,9 +1,3 @@
-#pragma once
-#include <JuceHeader.h>
-#include "signal.h"
-
-extern std::unique_ptr<settings_>    __opt;
-extern std::function<String(double)> __print;
 
 enum waiting_event_t
 {
@@ -49,9 +43,11 @@ private:
     std::unique_ptr<circle_>  _graph_data; // bug: очищать при смене устройства
     RectangleList<int>        _placed_extremes;
     waiting_t                 _wait;
+    signal_                 & _signal;
+    application_            & _app;
 
 public:
-    component_graph_()
+    component_graph_(application_ &app, signal_ &signal) : _signal(signal), _app(app)
     {
         reset();
 
@@ -79,11 +75,11 @@ public:
         for (const auto& display : Desktop::getInstance().getDisplays().displays)
             display_width += display.userArea.getWidth();
 
-        _graph_data = std::make_unique<circle_>(display_width);
+        _graph_data = std::make_unique<circle_>(_app, display_width);
     }
 
     void enqueue(const channel_t channel, const double value_raw) {
-        if (__opt->get_int(L"graph_paused") == 0) {
+        if (_app.get_int(L"graph_paused") == 0) {
             if (isfinite(value_raw)) {
                 _graph_data->enqueue(channel, value_raw);
 
@@ -331,8 +327,8 @@ public:
         _placed_extremes.clear();
         for (auto channel = RIGHT; channel < CHANNEL_SIZE; channel--)
         {
-            if (channel == LEFT  && __opt->get_int(L"graph_left" ) == 0) continue;
-            if (channel == RIGHT && __opt->get_int(L"graph_right") == 0) continue;
+            if (channel == LEFT  && _app.get_int(L"graph_left" ) == 0) continue;
+            if (channel == RIGHT && _app.get_int(L"graph_right") == 0) continue;
 
             _extremes = _graph_data->get_extremes(channel, _plot.getWidth());
 
@@ -363,5 +359,5 @@ public:
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(component_graph_)
-
 };
+

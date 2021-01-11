@@ -19,7 +19,6 @@
       <FILE id="owFCqK" name="gui_theme.h" compile="0" resource="0" file="Source/gui_theme.h"/>
       <FILE id="FOprC1" name="main.cpp" compile="1" resource="0" file="Source/main.cpp"/>
       <FILE id="GuKL11" name="main.h" compile="0" resource="0" file="Source/main.h"/>
-      <FILE id="wPVTwc" name="settings.h" compile="0" resource="0" file="Source/settings.h"/>
       <FILE id="xcce8E" name="signal.h" compile="0" resource="0" file="Source/signal.h"/>
     </GROUP>
   </MAINGROUP>

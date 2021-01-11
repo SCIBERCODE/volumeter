@@ -1,28 +1,57 @@
 #include <JuceHeader.h>
-#include "main.h"
+#include <memory>
+#include <variant>
+#include <spuce/filters/iir.h>
+#include <spuce/filters/butterworth_iir.h>
+
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include "gui_theme.h"
+#include "main.h"
+#include "signal.h"
+#include "gui_filter.h"
+#include "gui_calibration.h"
+#include "gui_graph.h"
 #include "gui.h"
 
-std::unique_ptr<settings_>     __opt;
-std::unique_ptr<theme::light_> __theme;
-std::function<String(double)>  __print; // todo: центровать цифры по точке
-
-
 application_::application_() {
-    __opt   = std::make_unique<settings_>();
-    __theme = std::make_unique<theme::light_>();
+    _theme = std::make_unique<theme::light_>();
+
+    PropertiesFile::Options params;
+    params.applicationName = L"volumeter";
+    params.filenameSuffix  = L".xml";
+    params.folderName      = File::getCurrentWorkingDirectory().getFullPathName();
+    params.storageFormat   = PropertiesFile::storeAsXML;
+    _settings.setStorageParameters(params);
 }
 
 application_::~application_() {
-    __opt  .reset();
-    __theme.reset();
+    _theme.reset();
 }
 
-application_::main_window_::main_window_(const String& name, JUCEApplication& app) :
-    DocumentWindow(name, __theme->get_bg_color(), DocumentWindow::allButtons),
+theme::light_ *application_::get_theme() const {
+    return _theme.get();
+}
+
+void application_::initialise(const String&)
+{
+    Desktop::getInstance().setDefaultLookAndFeel(_theme.get());
+    _main_window = std::make_unique<main_window_>(L"rms volumeter", *this);
+}
+
+const String application_::getApplicationName()        { return L"rms_volumeter";    }
+const String application_::getApplicationVersion()     { return __DATE__;            }
+bool  application_::moreThanOneInstanceAllowed()       { return true;                }
+void  application_::shutdown()                         { _main_window = nullptr;     }
+void  application_::main_window_::closeButtonPressed() { _app.systemRequestedQuit(); }
+
+//=================================================================================================
+application_::main_window_::main_window_(const String& name, application_& app) :
+    DocumentWindow(name, app.get_theme()->get_bg_color(), DocumentWindow::allButtons),
     _app(app)
 {
-    _content = std::make_unique<main_component_>();
+    _content = std::make_unique<main_component_>(app);
 
     setUsingNativeTitleBar(false);
     setTitleBarTextCentred(true);
@@ -33,18 +62,7 @@ application_::main_window_::main_window_(const String& name, JUCEApplication& ap
     toFront(true);
 }
 
-void application_::initialise(const String&)
-{
-    Desktop::getInstance().setDefaultLookAndFeel(__theme.get());
-    _main_window = std::make_unique<main_window_>(L"rms volumeter", *this);
-}
-
-const String application_::getApplicationName()        { return L"rms_volumeter";    }
-const String application_::getApplicationVersion()     { return __DATE__;            }
-bool  application_::moreThanOneInstanceAllowed()       { return true;                }
-void  application_::shutdown()                         { _main_window = nullptr;     }
-void  application_::main_window_::closeButtonPressed() { _app.systemRequestedQuit(); }
-
+//=================================================================================================
 const String prefix(const double value, const wchar_t *unit, const size_t numder_of_decimals)
 {
     auto   symbol    = String();
@@ -77,3 +95,4 @@ const bool round_flt(const float value) {
 }
 
 START_JUCE_APPLICATION(application_)
+

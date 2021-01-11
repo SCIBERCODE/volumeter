@@ -1,9 +1,3 @@
-#pragma once
-#include <JuceHeader.h>
-#include "signal.h"
-
-extern std::unique_ptr<settings_>     __opt;
-extern std::unique_ptr<theme::light_> __theme;
 
 enum class cell_data_t { name, left, right, button };
 
@@ -36,7 +30,6 @@ class component_calibration_ : public Component,
 private:
     std::vector<cal_t> rows;
     int                selected = -1;
-    signal_          & signal; // todo: использовать умные указатели
     GroupComponent     group;
     ToggleButton       checkbox_cal       {      L"Use Calibration" };
     Label              label_cal_add      { { }, L"Name"            },
@@ -47,17 +40,19 @@ private:
     ComboBox           combo_prefix;
     TextButton         button_cal_add;
 
+    signal_          & _signal; // todo: использовать умные указатели
+    application_     & _app;
 public:
 
-    component_calibration_(signal_& _signal) : signal(_signal)
+    component_calibration_(application_ &app, signal_ &signal) : _signal(signal), _app(app)
     {
         addAndMakeVisible(group);
         addAndMakeVisible(checkbox_cal);
-        checkbox_cal.setToggleState(__opt->get_int(L"checkbox_cal"), dontSendNotification);
+        checkbox_cal.setToggleState(_app.get_int(L"checkbox_cal"), dontSendNotification);
         checkbox_cal.onClick = [this]
         {
-            __opt->save(L"checkbox_cal", checkbox_cal.getToggleState());
-            signal.extremes_clear(); // todo: сохранять статистику, переводя в вольты
+            _app.save(L"checkbox_cal", checkbox_cal.getToggleState());
+            _signal.extremes_clear(); // todo: сохранять статистику, переводя в вольты
         };
 
         addAndMakeVisible(table_cals);
@@ -92,10 +87,10 @@ public:
         for (auto const& pref : __prefs)
             combo_prefix.addItem(pref.second + L"V", pref.first + 1);
 
-        combo_prefix.setSelectedId(__opt->get_int(L"combo_prefix") + 1);
+        combo_prefix.setSelectedId(_app.get_int(L"combo_prefix") + 1);
         combo_prefix.onChange = [this]
         {
-            __opt->save(L"combo_prefix", combo_prefix.getSelectedId() - 1);
+            _app.save(L"combo_prefix", combo_prefix.getSelectedId() - 1);
         };
 
         button_cal_add.setConnectedEdges(ToggleButton::ConnectedOnLeft);
@@ -103,7 +98,7 @@ public:
         button_cal_add.onClick = [=]
         {
             double channels[CHANNEL_SIZE];
-            const auto pref = __opt->get_int(L"combo_prefix");
+            const auto pref = _app.get_int(L"combo_prefix");
 
             for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
             {
@@ -113,12 +108,12 @@ public:
                 channels[channel] = channel_text.getDoubleValue() * pow(10.0, pref);
             }
 
-            auto cals = __opt->get_xml(L"calibrations");
+            auto cals = _app.get_xml(L"calibrations");
             if (cals == nullptr)
                 cals = std::make_unique<XmlElement>(StringRef(L"ROWS"));
 
             auto* e  = cals->createNewChildElement(StringRef(L"ROW"));
-            auto rms = signal.get_rms();
+            auto rms = _signal.get_rms();
 
             e->setAttribute(Identifier(L"name"),        editor_cal_name.getText());
             e->setAttribute(Identifier(L"left"),        channels[LEFT ]);
@@ -126,7 +121,7 @@ public:
             e->setAttribute(Identifier(L"right"),       channels[RIGHT]);
             e->setAttribute(Identifier(L"right_coeff"), channels[RIGHT] / rms.at(RIGHT)); // todo: check for nan
 
-            __opt->save(L"calibrations", cals.get());
+            _app.save(L"calibrations", cals.get());
             update();
         };
     }
@@ -138,7 +133,7 @@ public:
     void update()
     {
         rows.clear();
-        if (auto cals = __opt->get_xml(L"calibrations")) {
+        if (auto cals = _app.get_xml(L"calibrations")) {
             forEachXmlChildElement(*cals, el)
             {
                 rows.push_back(cal_t{
@@ -150,7 +145,7 @@ public:
                 });
             }
         }
-        selected = __opt->get_int(L"calibrations_index");
+        selected = _app.get_int(L"calibrations_index");
         table_cals.updateContent();
     };
 
@@ -169,7 +164,7 @@ public:
     void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на всём компоненте
         auto current = table_cals.getSelectedRow();
         selected = current == selected ? -1 : current;
-        __opt->save(L"calibrations_index", selected);
+        _app.save(L"calibrations_index", selected);
         repaint();
     }
 
@@ -234,7 +229,7 @@ public:
         table_cals.setBounds(area);
 
         group.setBounds(getLocalBounds());
-        __theme->set_header_checkbox_bounds(checkbox_cal);
+        _app.get_theme()->set_header_checkbox_bounds(checkbox_cal);
     }
 
     size_t get_table_height() {
@@ -263,16 +258,16 @@ public:
         if (selected == del_row)
         {
             selected = -1;
-            __opt->save(L"calibrations_index", selected);
+            _app.save(L"calibrations_index", selected);
         }
         else if (del_row < selected)
         {
             selected--;
-            __opt->save(L"calibrations_index", selected);
+            _app.save(L"calibrations_index", selected);
         }
         table_cals.updateContent();
 
-        auto cals = __opt->get_xml(L"calibrations");
+        auto cals = _app.get_xml(L"calibrations");
         if (cals == nullptr) {
             cals = std::make_unique<XmlElement>(StringRef(L"ROWS"));
             cals->createNewChildElement(StringRef(L"SELECTION"))->setAttribute(Identifier(L"cal_index"), -1);
@@ -288,7 +283,7 @@ public:
             e->setAttribute(Identifier(L"right"),       row.channel[RIGHT]);
             e->setAttribute(Identifier(L"right_coeff"), row.coeff  [RIGHT]);
         }
-        __opt->save(L"calibrations", cals.get());
+        _app.save(L"calibrations", cals.get());
     }
 
 private:
@@ -317,8 +312,7 @@ private:
         }
     private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(table_custom_button_)
-
     };
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(component_calibration_)
-
 };
+
