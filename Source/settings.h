@@ -1,13 +1,14 @@
-﻿#pragma once
+#pragma once
 
 class settings_ {
 protected:
-    struct option_t {
+    struct option_t
+    {
         String xml_name;
         String default_value;
     };
 
-    const multimap<String, option_t> options {
+    const std::multimap<String, option_t> options {
         { L"combo_dev_type",     { L"device_type",        L"ASIO"  } },
         { L"combo_dev_output",   { L"device",             { }      } },
         { L"combo_dev_rate",     { L"sample_rate",        L"44100" } },
@@ -40,7 +41,7 @@ private:
         первые два столбца settings_::options имеют одинаковый вес при поиске,
         но в порядке очерёдности
     */
-    const option_t* get_option(const String& request) {
+    const option_t* get_option(const String& request) const {
         auto find_key = options.find(request);
 
         if (find_key != options.end() && find_key->first.isNotEmpty())
@@ -87,16 +88,16 @@ public:
         return String();
     }
 
-    int get_int(const String& component_name) {
+    const int get_int(const String& component_name) {
         auto str_value = get_text(component_name);
         return str_value.isNotEmpty() ? str_value.getIntValue() : 0;
     }
 
-    auto get_xml(const String& component_name) {
+    const auto get_xml(const String& component_name) {
         if (auto option = get_option(component_name))
             return settings.getUserSettings()->getXmlValue(option->xml_name);
 
-        return unique_ptr<XmlElement>{ };
+        return std::unique_ptr<XmlElement>{ };
     }
 
 private:

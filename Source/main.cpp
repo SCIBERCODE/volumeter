@@ -1,17 +1,14 @@
-﻿#include <JuceHeader.h>
-
-using namespace std;
-
+#include <JuceHeader.h>
 #include "main.h"
 #include "gui_theme.h"
 #include "gui.h"
 
-unique_ptr<settings_>     __opt;
-unique_ptr<theme::light_> __theme;
+std::unique_ptr<settings_>     __opt;
+std::unique_ptr<theme::light_> __theme;
 
 application_::application_() {
-    __opt   = make_unique<settings_>();
-    __theme = make_unique<theme::light_>();
+    __opt   = std::make_unique<settings_>();
+    __theme = std::make_unique<theme::light_>();
 }
 
 application_::~application_() {
@@ -23,7 +20,7 @@ application_::main_window_::main_window_(const String& name, JUCEApplication& ap
     DocumentWindow(name, __theme->get_bg_color(), DocumentWindow::allButtons),
     _app(app)
 {
-    _content = make_unique<main_component_>();
+    _content = std::make_unique<main_component_>();
 
     setUsingNativeTitleBar(false);
     setTitleBarTextCentred(true);
@@ -37,7 +34,7 @@ application_::main_window_::main_window_(const String& name, JUCEApplication& ap
 void application_::initialise(const String&)
 {
     Desktop::getInstance().setDefaultLookAndFeel(__theme.get());
-    _main_window = make_unique<main_window_>(L"rms volumeter", *this);
+    _main_window = std::make_unique<main_window_>(L"rms volumeter", *this);
 }
 
 const String application_::getApplicationName()        { return L"rms_volumeter";    }
@@ -46,7 +43,7 @@ bool  application_::moreThanOneInstanceAllowed()       { return true;           
 void  application_::shutdown()                         { _main_window = nullptr;     }
 void  application_::main_window_::closeButtonPressed() { _app.systemRequestedQuit(); }
 
-String prefix(const double value, const wchar_t *unit, const size_t numder_of_decimals)
+const String prefix(const double value, const wchar_t *unit, const size_t numder_of_decimals)
 {
     auto   symbol    = String();
     double new_value = value;
@@ -65,15 +62,15 @@ String prefix(const double value, const wchar_t *unit, const size_t numder_of_de
     return String(new_value, static_cast<int>(numder_of_decimals)) + L" " + symbol + String(unit);
 }
 
-String prefix_v(const double value) {
+const String prefix_v(const double value) {
     return prefix(value, L"V", 5);
 }
 
-bool is_about_equal(const float a, const float b) {
+const bool is_about_equal(const float a, const float b) {
     return fabs(a - b) <= ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * FLT_EPSILON);
 }
 
-bool round_flt(const float value) {
+const bool round_flt(const float value) {
     return round(value * 10000.0f) / 10000.0f;
 }
 

@@ -9,10 +9,10 @@
 const auto MF_PI   = static_cast<float>(M_PI);
 const auto MF_PI_2 = static_cast<float>(M_PI_2);
 
-const vector<float>    __buff_size_list_sec { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f, 30.0f };
-const vector<int>      __tone_list          { 10, 20, 200, 500, 1000, 2000, 5000, 10000, 20000 };
+const float __buff_size_list_sec[] { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f, 30.0f };
+const int   __tone_list         [] { 10, 20, 200, 500, 1000, 2000, 5000, 10000, 20000 };
 
-const map<int, String> __prefs {
+const std::map<int, String> __prefs {
     { -15, L"f"      },
     { -12, L"p"      },
     {  -9, L"n"      },
@@ -34,7 +34,7 @@ enum volume_t : size_t {
     VOLUME_SIZE
 };
 
-const map<size_t, String> __channel_name {
+const std::map<size_t, String> __channel_name {
     { LEFT,  L"Left"  },
     { RIGHT, L"Right" }
 };
@@ -69,11 +69,11 @@ void operator --(channel_t& value, int)
     value = value == 0 ? CHANNEL_SIZE : static_cast<channel_t>(value - 1);
 }
 
-String prefix  (double value, const wchar_t *unit, size_t numder_of_decimals);
-String prefix_v(double value);
+const String prefix  (double value, const wchar_t *unit, size_t numder_of_decimals);
+const String prefix_v(double value);
 
-bool is_about_equal(float a, float b);
-bool round_flt     (float value);
+const bool is_about_equal(float a, float b);
+const bool round_flt     (float value);
 
 class main_component_;
 
@@ -98,12 +98,12 @@ protected:
 
     private:
         JUCEApplication&            _app;
-        unique_ptr<main_component_> _content;
+        std::unique_ptr<main_component_> _content;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_window_)
     };
 
 private:
-    unique_ptr<main_window_> _main_window;
+    std::unique_ptr<main_window_> _main_window;
 
 };

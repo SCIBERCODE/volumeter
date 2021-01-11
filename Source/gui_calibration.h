@@ -2,47 +2,50 @@
 #include <JuceHeader.h>
 #include "signal.h"
 
-extern unique_ptr<settings_>     __opt;
-extern unique_ptr<theme::light_> __theme;
+extern std::unique_ptr<settings_>     __opt;
+extern std::unique_ptr<theme::light_> __theme;
 
-class component_calibration_ : public Component,
-                               public TableListBoxModel
+enum class cell_data_t { name, left, right, button };
+
+struct column_t
 {
-protected:
-    enum class cell_data_t { name, left, right, button };
+    const cell_data_t type;
+    const wchar_t    *header;
+    const size_t      width;
+};
 
-    struct column_t
-    {
-        const cell_data_t type;
-        const wchar_t    *header;
-        const size_t      width;
-    };
-    const vector<column_t> columns =
-    {
-        { cell_data_t::name,   L"Name",  300 },
-        { cell_data_t::left,   L"Left",  100 },
-        { cell_data_t::right,  L"Right", 100 },
-        { cell_data_t::button, L"",      30  },
-    };
-    struct cal_t
-    {
-        String name;
-        double channel[CHANNEL_SIZE];
-        double coeff  [CHANNEL_SIZE];
-    };
+struct cal_t
+{
+    String name;
+    double channel[CHANNEL_SIZE];
+    double coeff  [CHANNEL_SIZE];
+};
+
+const std::vector<column_t> __columns
+{
+    { cell_data_t::name,   L"Name",  300 },
+    { cell_data_t::left,   L"Left",  100 },
+    { cell_data_t::right,  L"Right", 100 },
+    { cell_data_t::button, L"",      30  }
+};
+
+//=================================================================================================
+class component_calibration_ : public Component,
+                               public TableListBoxModel {
+//=================================================================================================
 private:
-    vector<cal_t>  rows;
-    int            selected = -1;
-    signal_      & signal; // todo: использовать умные указатели
-    GroupComponent group;
-    ToggleButton   checkbox_cal       {      L"Use Calibration" };
-    Label          label_cal_add      { { }, L"Name"            },
-                   label_cal_channels { { }, L"Left/Right"      };
-    TableListBox   table_cals;
-    TextEditor     editor_cal_name;
-    TextEditor     editor_cal_channels[CHANNEL_SIZE];
-    ComboBox       combo_prefix;
-    TextButton     button_cal_add;
+    std::vector<cal_t> rows;
+    int                selected = -1;
+    signal_          & signal; // todo: использовать умные указатели
+    GroupComponent     group;
+    ToggleButton       checkbox_cal       {      L"Use Calibration" };
+    Label              label_cal_add      { { }, L"Name"            },
+                       label_cal_channels { { }, L"Left/Right"      };
+    TableListBox       table_cals;
+    TextEditor         editor_cal_name;
+    TextEditor         editor_cal_channels[CHANNEL_SIZE];
+    ComboBox           combo_prefix;
+    TextButton         button_cal_add;
 
 public:
 
@@ -68,7 +71,7 @@ public:
         table_cals.getViewport()->setScrollBarsShown(true, false);
 
         size_t id = 0;
-        for (auto const& column : columns)
+        for (auto const& column : __columns)
             table_cals.getHeader().addColumn(column.header, ++id, column.width, 30, -1, TableHeaderComponent::notSortable);
 
         addAndMakeVisible(label_cal_add);
@@ -111,7 +114,7 @@ public:
 
             auto cals = __opt->get_xml(L"calibrations");
             if (cals == nullptr)
-                cals = make_unique<XmlElement>(StringRef(L"ROWS"));
+                cals = std::make_unique<XmlElement>(StringRef(L"ROWS"));
 
             auto* e  = cals->createNewChildElement(StringRef(L"ROW"));
             auto rms = signal.get_rms();
@@ -191,7 +194,7 @@ public:
 
     void paintCell(Graphics& g, int row, int column_id, int width, int height, bool /*selected*/) override
     {
-        auto data_selector = columns.at(column_id - 1).type;
+        auto data_selector = __columns.at(column_id - 1).type;
         String text(theme::empty);
 
         switch (data_selector) {
@@ -241,11 +244,11 @@ public:
     // bug: ширина кнопок меняется скачками
     Component* refreshComponentForCell(int row, int column_id, bool /*selected*/, Component* component) override
     {
-        if (columns.at(column_id - 1).type == cell_data_t::button)
+        if (__columns.at(column_id - 1).type == cell_data_t::button)
         {
             auto* button = static_cast<table_custom_button_*>(component);
             if (button == nullptr)
-                button = make_unique<table_custom_button_>(*this).release();
+                button = std::make_unique<table_custom_button_>(*this).release();
 
             button->set_row(row);
             return button;
@@ -271,7 +274,7 @@ public:
 
         auto cals = __opt->get_xml(L"calibrations");
         if (cals == nullptr) {
-            cals = make_unique<XmlElement>(StringRef(L"ROWS"));
+            cals = std::make_unique<XmlElement>(StringRef(L"ROWS"));
             cals->createNewChildElement(StringRef(L"SELECTION"))->setAttribute(Identifier(L"cal_index"), -1);
         }
         cals->deleteAllChildElements();

@@ -5,21 +5,20 @@
 #include "gui_calibration.h"
 #include "gui_graph.h"
 
-extern unique_ptr<settings_> __opt;
+extern std::unique_ptr<settings_> __opt;
 
-using controls_t = variant<shared_ptr<Label>, shared_ptr<ToggleButton>>;
+using controls_t = std::variant<std::shared_ptr<Label>, std::shared_ptr<ToggleButton>>;
 
 template <typename T>
-shared_ptr<T> __get(controls_t var)
+std::shared_ptr<T> __get(controls_t var)
 {
-    return *get_if<shared_ptr<T>>(&var);
+    return *std::get_if<std::shared_ptr<T>>(&var);
 }
 
+//=================================================================================================
 class main_component_ : public AudioAppComponent,
-                        public Timer
-{
-protected:
-    signal_                    _signal;
+                        public Timer {
+//=================================================================================================
 private:
     Label                      label_device_type { { }, L"Type"        },
                                label_device      { { }, L"Device"      },
@@ -36,6 +35,7 @@ private:
     ComboBox                   combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
     controls_t                 stat_controls[VOLUME_SIZE][LABELS_STAT_COLUMN_SIZE];
 
+    signal_                    _signal;
 //=================================================================================================
 public:
     main_component_() :
@@ -91,7 +91,7 @@ public:
                     // создание галочек выбора каналов для отображения на графике
                     if (line == LEFT || line == RIGHT)
                     {
-                        auto       checkbox     = make_shared<ToggleButton>();
+                        auto       checkbox     = std::make_shared<ToggleButton>();
                         auto&      props        = checkbox->getProperties();
                         const auto channel_name = __channel_name.at(line).toLowerCase();
                         const auto option_name = L"graph_" + channel_name;
@@ -114,7 +114,7 @@ public:
                         addAndMakeVisible(*checkbox);
                     }
                     if (line == BALANCE) {
-                        auto label = make_shared<Label>();
+                        auto label = std::make_shared<Label>();
                         label->setText(L"Balance", dontSendNotification);
                         label->setJustificationType(Justification::centredRight);
                         stat_controls[line][column] = label;
@@ -123,7 +123,7 @@ public:
                 }
                 else // создание лабелов с данными и экстремумами
                 { // todo: сработка соответствующих галочек при нажатии на цифры показометра
-                    auto label = make_shared<Label>();
+                    auto label = std::make_shared<Label>();
 
                     if (column == VALUE)
                         label->setFont(label->getFont().boldened());
@@ -280,9 +280,7 @@ public:
     //=============================================================================================
     // переопределённые методы
 
-    void releaseResources() override {
-
-    }
+    void releaseResources() override { }
 
     void prepareToPlay(const int /*samples_per_block*/, const double sample_rate) override
     {
@@ -387,7 +385,7 @@ public:
         if (component_graph.is_waiting())
             component_graph.stop_waiting();
 
-        function<String(double)> print; // todo: центровать цифры по точке
+        std::function<String(double)> print; // todo: центровать цифры по точке
 
         auto calibrate = component_calibration.is_active();
         if (calibrate)
@@ -408,7 +406,7 @@ public:
         String printed[3];
         for (size_t line = LEFT; line < VOLUME_SIZE; line++)
         {
-            fill_n(printed, _countof(printed), theme::empty);
+            std::fill_n(printed, _countof(printed), theme::empty);
             auto extremes = _signal.extremes_get(line);
 
             if (isfinite(rms.at(line)))  printed[0] = print(rms.at(line));

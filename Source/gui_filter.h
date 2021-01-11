@@ -2,28 +2,29 @@
 #include <JuceHeader.h>
 #include "signal.h"
 
-extern unique_ptr<settings_>     __opt;
-extern unique_ptr<theme::light_> __theme;
+extern std::unique_ptr<settings_>     __opt;
+extern std::unique_ptr<theme::light_> __theme;
+
+const int __order_list[] { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
+
+const std::pair<const wchar_t *, const wchar_t *> __type_text[FILTER_TYPE_SIZE]
+{
+    std::make_pair(L"High pass", L"pass_high"),
+    std::make_pair(L"Low pass" , L"pass_low" )
+};
 
 // bug: самовозбуд стейнберга при выкрученной громкости на lpf 15000
-
-class component_filter_ : public Component
-{
-protected:
-    const vector<int> order_list { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
-    const pair<const wchar_t *, const wchar_t *> type_text[FILTER_TYPE_SIZE] =
-    {
-        make_pair(L"High pass", L"pass_high"),
-        make_pair(L"Low pass" , L"pass_low" )
-    };
+//=================================================================================================
+class component_filter_ : public Component {
+//=================================================================================================
 private:
-    signal_                   & signal;
-    theme::checkbox_right_tick_ theme_right;
-    GroupComponent              group { { }, L"Filter(s)" };
-    unique_ptr<ToggleButton>    checkbox_type[FILTER_TYPE_SIZE];
-    unique_ptr<Label>           label_desc   [FILTER_TYPE_SIZE];
-    unique_ptr<TextEditor>      edit_freq    [FILTER_TYPE_SIZE];
-    unique_ptr<ComboBox>        combo_order  [FILTER_TYPE_SIZE];
+    signal_                        & signal;
+    theme::checkbox_right_tick_      theme_right;
+    GroupComponent                   group        { { }, L"Filter(s)" };
+    std::unique_ptr<ToggleButton>    checkbox_type[FILTER_TYPE_SIZE];
+    std::unique_ptr<Label>           label_desc   [FILTER_TYPE_SIZE];
+    std::unique_ptr<TextEditor>      edit_freq    [FILTER_TYPE_SIZE];
+    std::unique_ptr<ComboBox>        combo_order  [FILTER_TYPE_SIZE];
 
 public:
 
@@ -34,17 +35,17 @@ public:
 
         for (auto type = HIGH_PASS; type < FILTER_TYPE_SIZE; type++)
         {
-            checkbox_type[type] = make_unique<ToggleButton>(type_text[type].first);
-            label_desc   [type] = make_unique<Label>();
-            edit_freq    [type] = make_unique<TextEditor>();
-            combo_order  [type] = make_unique<ComboBox>();
+            checkbox_type[type] = std::make_unique<ToggleButton>(__type_text[type].first);
+            label_desc   [type] = std::make_unique<Label>();
+            edit_freq    [type] = std::make_unique<TextEditor>();
+            combo_order  [type] = std::make_unique<ComboBox>();
 
             auto button = checkbox_type[type].get();
             auto label  = label_desc   [type].get();
             auto edit   = edit_freq    [type].get();
             auto combo  = combo_order  [type].get();
 
-            auto option = String(type_text[type].second);
+            auto option = String(__type_text[type].second);
 
             addAndMakeVisible(button);
             addAndMakeVisible(label);
@@ -87,7 +88,7 @@ public:
                 edit->setText(value, true);
 
             // порядок фильтра
-            for (auto const item : order_list)
+            for (auto const item : __order_list)
                 combo->addItem(String(item), item);
 
             combo->setSelectedId(__opt->get_int(option + L"_order"), dontSendNotification);

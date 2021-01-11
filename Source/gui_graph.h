@@ -2,61 +2,61 @@
 #include <JuceHeader.h>
 #include "signal.h"
 
-extern unique_ptr<settings_> __opt;
+extern std::unique_ptr<settings_> __opt;
 
-enum waiting_event_t {
+enum waiting_event_t
+{
     device_init,
     buffer_fill
+};
+struct range_t
+{
+    uint64_t start;
+    uint64_t stop;
+};
+enum class range_types_t : size_t
+{
+    tone,
+    zero,
+    //calibration, // todo: пересчитывать все значения, график не должен визуально изменяться
+    high_pass,
+    low_pass
+};
+struct waiting_t
+{
+    bool                         running        = false;
+    const size_t                 timer_value_ms = 100;   // интервал обновления на экране и одновременного декремента остатка таймера
+    size_t                       remain_ms;              // декремент остатка
+    size_t                       interval_ms;            // полное время ожидания
+    double                       progress_value = -1.0;  // переменная в диапазоне 0.0 .. 1.0, отслеживаемая ProgressBar контролом
+    std::unique_ptr<ProgressBar> progress_bar;
+    std::unique_ptr<Label>       stub_bg;                // полупрозрачная заливка
+    std::unique_ptr<Label>       stub_text;
+    waiting_event_t              event;
 };
 
 // bug: провалы вверх при переключении фильтра
 //         ! и, соответственно, вниз при частично заполненном буфере, что происходит при переключении параметров
-
+//=================================================================================================
 class component_graph_ : public Component,
-                         public Timer
-{
-protected:
-    struct range_t
-    {
-        uint64_t start;
-        uint64_t stop;
-    };
-    enum class range_types_t : size_t
-    {
-        tone,
-        zero,
-        //calibration, // todo: пересчитывать все значения, график не должен визуально изменяться
-        high_pass,
-        low_pass
-    };
-    struct waiting_t
-    {
-        bool                    running        = false;
-        const size_t            timer_value_ms = 100;   // интервал обновления на экране и одновременного декремента остатка таймера
-        size_t                  remain_ms;              // декремент остатка
-        size_t                  interval_ms;            // полное время ожидания
-        double                  progress_value = -1.0;  // переменная в диапазоне 0.0 .. 1.0, отслеживаемая ProgressBar контролом
-        unique_ptr<ProgressBar> progress_bar;
-        unique_ptr<Label>       stub_bg;                // полупрозрачная заливка
-        unique_ptr<Label>       stub_text;
-        waiting_event_t         event;
-    };
+                         public Timer {
+//=================================================================================================
 private:
-    Rectangle<int>       _plot;
-    Rectangle<int>       _plot_indented;
-    unique_ptr<double[]> _extremes;
-    unique_ptr<circle_>  _graph_data; // bug: очищать при смене устройства
-    RectangleList<int>   _placed_extremes;
-    waiting_t            _wait;
+    Rectangle<int>            _plot;
+    Rectangle<int>            _plot_indented;
+    std::unique_ptr<double[]> _extremes;
+    std::unique_ptr<circle_>  _graph_data; // bug: очищать при смене устройства
+    RectangleList<int>        _placed_extremes;
+    waiting_t                 _wait;
 
 public:
     component_graph_()
     {
         reset();
 
-        _wait.progress_bar = make_unique<ProgressBar>(_wait.progress_value);
-        _wait.stub_bg      = make_unique<Label>();
-        _wait.stub_text    = make_unique<Label>();
+        _wait.progress_bar = std::make_unique<ProgressBar>(_wait.progress_value);
+        _wait.stub_bg      = std::make_unique<Label>();
+        _wait.stub_text    = std::make_unique<Label>();
 
         _wait.stub_bg  ->setColour(Label::backgroundColourId, Colours::white.withAlpha(0.7f));
         _wait.stub_text->setJustificationType(Justification::centred);
@@ -78,10 +78,10 @@ public:
         for (const auto& display : Desktop::getInstance().getDisplays().displays)
             display_width += display.userArea.getWidth();
 
-        _graph_data = make_unique<circle_>(display_width);
+        _graph_data = std::make_unique<circle_>(display_width);
     }
 
-    void enqueue(const vector<double>& rms) {
+    void enqueue(const std::vector<double>& rms) {
         if (__opt->get_int(L"graph_paused") == 0) {
             if (isfinite(rms.at(LEFT))) {
                 _graph_data->enqueue(LEFT,  static_cast<float>(rms.at(LEFT )));
@@ -328,9 +328,8 @@ public:
     }
 
     //=============================================================================================
-    void timerCallback() override
+    void timerCallback() override {
         //=========================================================================================
-    {
         _wait.stub_text->setText(get_timer_text(_wait.event), dontSendNotification);
         if (_wait.remain_ms >= _wait.timer_value_ms)
         {

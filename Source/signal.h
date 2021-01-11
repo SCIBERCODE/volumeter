@@ -6,12 +6,11 @@
 
 using namespace spuce;
 
-extern unique_ptr<settings_> __opt;
+extern std::unique_ptr<settings_> __opt;
 
 //=================================================================================================
-class sin_
+class sin_ {
 //=================================================================================================
-{
 private:
     double
         _sample_rate,
@@ -49,9 +48,8 @@ public:
 };
 
 //=================================================================================================
-class circle_
+class circle_ {
 //=================================================================================================
-{
 protected:
     struct iterator_t
     {
@@ -65,18 +63,18 @@ protected:
         uint64_t index;
     };
 private:
-    unique_ptr<value_t[]> _buffers[CHANNEL_SIZE];
-    size_t                _tails  [CHANNEL_SIZE];
-    const size_t          _max_size;
-    iterator_t            _it;
-    uint64_t              _index;
-    bool                  _full; // как минимум единажды буфер был заполнен
+    std::unique_ptr<value_t[]> _buffers[CHANNEL_SIZE];
+    size_t                     _tails  [CHANNEL_SIZE];
+    const size_t               _max_size;
+    iterator_t                 _it;
+    uint64_t                   _index;
+    bool                       _full; // как минимум единажды буфер был заполнен
 public:
     circle_(const size_t max_size) :
         _max_size(max_size), _index(0), _full(false)
     {
         for (auto& buffer : _buffers)
-            buffer = make_unique<value_t[]>(_max_size);
+            buffer = std::make_unique<value_t[]>(_max_size);
 
         clear();
     }
@@ -87,7 +85,7 @@ public:
             if (_buffers[line])
                 for (size_t k = 0; k < _max_size; k++)
                 {
-                    _buffers[line][k].value = numeric_limits<double>::quiet_NaN();
+                    _buffers[line][k].value = std::numeric_limits<double>::quiet_NaN();
                     _buffers[line][k].index = 0;
                 }
 
@@ -110,18 +108,18 @@ public:
         }
     }
 
-    auto is_full() {
+    auto is_full() const {
         return _full;
     }
 
-    auto get_tail(const channel_t channel) {
+    auto get_tail(const channel_t channel) const {
         return _buffers[channel][_tails[channel]].value;
     }
 
-    bool get_rms(array<double, VOLUME_SIZE>& rms)
+    bool get_rms(std::array<double, VOLUME_SIZE>& rms) const
     {
-        double sum [CHANNEL_SIZE] = { 0.0, 0.0 };
-        size_t size[CHANNEL_SIZE] = { 0, 0 };
+        double sum [CHANNEL_SIZE] { };
+        size_t size[CHANNEL_SIZE] { };
 
         for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
             for (size_t k = 0; k < _max_size; ++k)
@@ -162,7 +160,7 @@ public:
     bool get_next_value(double& value, uint64_t* index = nullptr) {
         value_t result;
 
-        result.value = numeric_limits<double>::quiet_NaN();
+        result.value = std::numeric_limits<double>::quiet_NaN();
         result.index = 0;
 
         if (_it.pointer >= 0 && _it.size)
@@ -176,7 +174,7 @@ public:
             _it.size--;
         };
         if (!isfinite(result.value))
-            _it = { 0 };
+            _it = { };
         else
         {
             value = result.value;
@@ -187,7 +185,7 @@ public:
     }
 
     auto get_extremes(const channel_t channel, const size_t size) {
-        auto   result = make_unique<double[]>(EXTREMES_SIZE);
+        auto   result = std::make_unique<double[]>(EXTREMES_SIZE);
         double value;
 
         if (get_first_value(channel, size, value)) {
@@ -195,8 +193,8 @@ public:
             result[MAX] = value + 0.00001f; // todo: избавиться
             do {
                 if (!isfinite(value)) break;
-                result[MIN] = min(value, result[MIN]);
-                result[MAX] = max(value, result[MAX]);
+                result[MIN] = std::min(value, result[MIN]);
+                result[MAX] = std::max(value, result[MAX]);
             }
             while (get_next_value(value));
         }
@@ -209,19 +207,18 @@ private:
 };
 
 //=================================================================================================
-class signal_
+class signal_ {
 //=================================================================================================
-{
 private:
-    double              _sample_rate;
-    mutex               _locker;
-    sin_                _sin;
-    unique_ptr<circle_> _buff;
-    unique_ptr<iir<float_type, float_type>>
-                        _filters [CHANNEL_SIZE][FILTER_TYPE_SIZE];
-    size_t              _orders                [FILTER_TYPE_SIZE];
-    double              _extremes[VOLUME_SIZE ][EXTREMES_SIZE   ];
-    double              _zeros   [CHANNEL_SIZE];
+    double                   _sample_rate;
+    std::mutex               _locker;
+    sin_                     _sin;
+    std::unique_ptr<circle_> _buff;
+    std::unique_ptr<iir<float_type, float_type>>
+                             _filters [CHANNEL_SIZE][FILTER_TYPE_SIZE];
+    size_t                   _orders                [FILTER_TYPE_SIZE];
+    double                   _extremes[VOLUME_SIZE ][EXTREMES_SIZE   ];
+    double                   _zeros   [CHANNEL_SIZE];
 public:
 
     signal_()
@@ -234,16 +231,16 @@ public:
     }
 
     void zero_set(
-        double value_left  = numeric_limits<double>::quiet_NaN(),
-        double value_right = numeric_limits<double>::quiet_NaN())
+        double value_left  = std::numeric_limits<double>::quiet_NaN(),
+        double value_right = std::numeric_limits<double>::quiet_NaN())
     {
-        lock_guard<mutex> locker(_locker);
+        std::lock_guard<std::mutex> locker(_locker);
         if (isfinite(value_left) && isfinite(value_right)) {
             _zeros[LEFT ] = value_left;
             _zeros[RIGHT] = value_right;
         }
         else {
-            array<double, VOLUME_SIZE> rms;
+            std::array<double, VOLUME_SIZE> rms;
             if (_buff->get_rms(rms))
             {
                 _zeros[LEFT ] = gain2db(rms[LEFT ]);
@@ -254,7 +251,7 @@ public:
         }
         extremes_clear();
     }
-    auto zero_get(const channel_t channel) {
+    auto zero_get(const channel_t channel) const {
         return _zeros[channel];
     }
     void zero_clear() {
@@ -262,26 +259,26 @@ public:
         extremes_clear();
     }
 
-    void extremes_set(const vector<double>& rms) {
+    void extremes_set(const std::vector<double>& rms) {
         for (size_t line = LEFT; line < VOLUME_SIZE; line++)
             if (isfinite(rms.at(line)))
             {
                 if (!isfinite(_extremes[line][MIN])) _extremes[line][MIN] = rms.at(line);
                 if (!isfinite(_extremes[line][MAX])) _extremes[line][MAX] = rms.at(line);
-                _extremes[line][MIN] = min(_extremes[line][MIN], rms.at(line));
-                _extremes[line][MAX] = max(_extremes[line][MAX], rms.at(line));
+                _extremes[line][MIN] = std::min(_extremes[line][MIN], rms.at(line));
+                _extremes[line][MAX] = std::max(_extremes[line][MAX], rms.at(line));
             }
     }
-    const auto extremes_get(const size_t channel) {
+    auto extremes_get(const size_t channel) const {
         return _extremes[channel];
     }
     void extremes_clear() {
         for (auto& line : _extremes)
             for (auto& column : line)
-                column = numeric_limits<double>::quiet_NaN();
+                column = std::numeric_limits<double>::quiet_NaN();
     }
 
-    double gain2db(const double gain) {
+    double gain2db(const double gain) const {
         return 20 * log10(gain);
     }
     void set_freq(const double freq) {
@@ -289,22 +286,22 @@ public:
         _sin.reset();
     }
     void change_buff_size(const int new_size) {
-        lock_guard<mutex> locker(_locker);
+        std::lock_guard<std::mutex> locker(_locker);
         if (new_size && _sample_rate) {
             auto number_of_samples = static_cast<size_t>(new_size / (1000.0 / _sample_rate));
-            _buff = make_unique<circle_>(number_of_samples);
+            _buff = std::make_unique<circle_>(number_of_samples);
         }
     }
     void clear_data() {
-        lock_guard<mutex> locker(_locker);
+        std::lock_guard<std::mutex> locker(_locker);
         if (_buff)
             _buff->clear();
     }
     void set_order(const filter_type_t filter_type, const int new_order) {
         _orders[filter_type] = new_order;
     }
-    vector<double> get_rms() {
-        array<double, VOLUME_SIZE> result;
+    std::vector<double> get_rms() const {
+        std::array<double, VOLUME_SIZE> result;
         if (_buff && _buff->get_rms(result))
         {
             return { result[LEFT], result[RIGHT] };
@@ -314,20 +311,20 @@ public:
 
     void filter_init(const filter_type_t filter_type)
     {
-        lock_guard<mutex> locker(_locker);
+        std::lock_guard<std::mutex> locker(_locker);
         for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
             if (filter_type == HIGH_PASS)
             {
                 iir_coeff high_pass(_orders[filter_type], filter_type::high);
                 butterworth_iir(high_pass, __opt->get_int(L"pass_high_freq") / _sample_rate, 3.0);
-                _filters[channel][HIGH_PASS] = make_unique<iir<float_type, float_type>>(high_pass);
+                _filters[channel][HIGH_PASS] = std::make_unique<iir<float_type, float_type>>(high_pass);
             }
             if (filter_type == LOW_PASS)
             {
                 iir_coeff low_pass(_orders[filter_type], filter_type::low);
                 butterworth_iir(low_pass, __opt->get_int(L"pass_low_freq") / _sample_rate, 3.0);
-                _filters[channel][LOW_PASS] = make_unique<iir<float_type, float_type>>(low_pass);
+                _filters[channel][LOW_PASS] = std::make_unique<iir<float_type, float_type>>(low_pass);
             }
         }
     };
