@@ -1,9 +1,9 @@
 
-const auto MF_PI   = static_cast<float>(M_PI);
-const auto MF_PI_2 = static_cast<float>(M_PI_2);
-
 namespace theme
 {
+    const auto MF_PI   = static_cast<float>(M_PI);
+    const auto MF_PI_2 = static_cast<float>(M_PI_2);
+
     const size_t height       = 20;
     const size_t margin       = 5;
     const size_t label_width  = 80;

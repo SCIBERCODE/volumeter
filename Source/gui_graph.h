@@ -1,42 +1,37 @@
 
-enum waiting_event_t
-{
-    device_init,
-    buffer_fill
-};
-struct range_t
-{
-    uint64_t start;
-    uint64_t stop;
-};
-enum class range_types_t : size_t
-{
-    tone,
-    zero,
-    //calibration, // todo: пересчитывать все значения, график не должен визуально изменяться
-    high_pass,
-    low_pass
-};
-struct waiting_t
-{
-    bool                         running        = false;
-    const size_t                 timer_value_ms = 100;   // интервал обновления на экране и одновременного декремента остатка таймера
-    size_t                       remain_ms;              // декремент остатка
-    size_t                       interval_ms;            // полное время ожидания
-    double                       progress_value = -1.0;  // переменная в диапазоне 0.0 .. 1.0, отслеживаемая ProgressBar контролом
-    std::unique_ptr<ProgressBar> progress_bar;
-    std::unique_ptr<Label>       stub_bg;                // полупрозрачная заливка
-    std::unique_ptr<Label>       stub_text;
-    waiting_event_t              event;
-};
-
 // bug: провалы вверх при переключении фильтра
 //         ! и, соответственно, вниз при частично заполненном буфере, что происходит при переключении параметров
-//=================================================================================================
+
 class component_graph_ : public Component,
                          public Timer {
 //=================================================================================================
 private:
+    struct range_t
+    {
+        uint64_t start;
+        uint64_t stop;
+    };
+    enum class range_types_t : size_t
+    {
+        tone,
+        zero,
+        //calibration, // todo: пересчитывать все значения, график не должен визуально изменяться
+        high_pass,
+        low_pass
+    };
+    struct waiting_t
+    {
+        bool                         running = false;
+        const size_t                 timer_value_ms = 100;   // интервал обновления на экране и одновременного декремента остатка таймера
+        size_t                       remain_ms;              // декремент остатка
+        size_t                       interval_ms;            // полное время ожидания
+        double                       progress_value = -1.0;  // переменная в диапазоне 0.0 .. 1.0, отслеживаемая ProgressBar контролом
+        std::unique_ptr<ProgressBar> progress_bar;
+        std::unique_ptr<Label>       stub_bg;                // полупрозрачная заливка
+        std::unique_ptr<Label>       stub_text;
+        waiting_event_t              event;
+    };
+
     Rectangle<int>            _plot;
     Rectangle<int>            _plot_indented;
     std::unique_ptr<double[]> _extremes;
@@ -45,9 +40,10 @@ private:
     waiting_t                 _wait;
     signal_                 & _signal;
     application_            & _app;
-
+//=================================================================================================
 public:
-    component_graph_(application_ &app, signal_ &signal) : _signal(signal), _app(app)
+    component_graph_(application_ &app, signal_ &signal) :
+        _signal(signal), _app(app)
     {
         reset();
 
@@ -79,7 +75,7 @@ public:
     }
 
     void enqueue(const channel_t channel, const double value_raw) {
-        if (_app.get_int(L"graph_paused") == 0) {
+        if (_app.get_int(option_t::graph_paused) == 0) {
             if (isfinite(value_raw)) {
                 _graph_data->enqueue(channel, value_raw);
 
@@ -327,8 +323,8 @@ public:
         _placed_extremes.clear();
         for (auto channel = RIGHT; channel < CHANNEL_SIZE; channel--)
         {
-            if (channel == LEFT  && _app.get_int(L"graph_left" ) == 0) continue;
-            if (channel == RIGHT && _app.get_int(L"graph_right") == 0) continue;
+            if (channel == LEFT  && _app.get_int(option_t::graph_left ) == 0) continue;
+            if (channel == RIGHT && _app.get_int(option_t::graph_right) == 0) continue;
 
             _extremes = _graph_data->get_extremes(channel, _plot.getWidth());
 

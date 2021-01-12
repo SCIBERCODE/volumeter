@@ -1,33 +1,32 @@
 
-enum class cell_data_t { name, left, right, button };
-
-struct column_t
-{
-    const cell_data_t type;
-    const wchar_t    *header;
-    const size_t      width;
-};
-
-struct cal_t
-{
-    String name;
-    double channel[CHANNEL_SIZE];
-    double coeff  [CHANNEL_SIZE];
-};
-
-const std::vector<column_t> __columns
-{
-    { cell_data_t::name,   L"Name",  300 },
-    { cell_data_t::left,   L"Left",  100 },
-    { cell_data_t::right,  L"Right", 100 },
-    { cell_data_t::button, L"",      30  }
-};
-
-//=================================================================================================
 class component_calibration_ : public Component,
                                public TableListBoxModel {
 //=================================================================================================
 private:
+    enum class cell_data_t { name, left, right, button };
+
+    struct column_t
+    {
+        const cell_data_t type;
+        const wchar_t    *header;
+        const size_t      width;
+    };
+
+    struct cal_t
+    {
+        String name;
+        double channel[CHANNEL_SIZE];
+        double coeff  [CHANNEL_SIZE];
+    };
+
+    const std::vector<column_t> _columns
+    {
+        { cell_data_t::name,   L"Name",  300 },
+        { cell_data_t::left,   L"Left",  100 },
+        { cell_data_t::right,  L"Right", 100 },
+        { cell_data_t::button, L"",      30  }
+    };
+
     std::vector<cal_t> rows;
     int                selected = -1;
     GroupComponent     group;
@@ -42,16 +41,18 @@ private:
 
     signal_          & _signal; // todo: использовать умные указатели
     application_     & _app;
+//=================================================================================================
 public:
 
-    component_calibration_(application_ &app, signal_ &signal) : _signal(signal), _app(app)
+    component_calibration_(application_ &app, signal_ &signal) :
+        _signal(signal), _app(app)
     {
         addAndMakeVisible(group);
         addAndMakeVisible(checkbox_cal);
-        checkbox_cal.setToggleState(_app.get_int(L"checkbox_cal"), dontSendNotification);
+        checkbox_cal.setToggleState(_app.get_int(option_t::calibrate), dontSendNotification);
         checkbox_cal.onClick = [this]
         {
-            _app.save(L"checkbox_cal", checkbox_cal.getToggleState());
+            _app.save(option_t::calibrate, checkbox_cal.getToggleState());
             _signal.extremes_clear(); // todo: сохранять статистику, переводя в вольты
         };
 
@@ -66,7 +67,7 @@ public:
         table_cals.getViewport()->setScrollBarsShown(true, false);
 
         size_t id = 0;
-        for (auto const& column : __columns)
+        for (auto const& column : _columns)
             table_cals.getHeader().addColumn(column.header, ++id, column.width, 30, -1, TableHeaderComponent::notSortable);
 
         addAndMakeVisible(label_cal_add);
@@ -87,10 +88,10 @@ public:
         for (auto const& pref : __prefs)
             combo_prefix.addItem(pref.second + L"V", pref.first + 1);
 
-        combo_prefix.setSelectedId(_app.get_int(L"combo_prefix") + 1);
+        combo_prefix.setSelectedId(_app.get_int(option_t::prefix) + 1);
         combo_prefix.onChange = [this]
         {
-            _app.save(L"combo_prefix", combo_prefix.getSelectedId() - 1);
+            _app.save(option_t::prefix, combo_prefix.getSelectedId() - 1);
         };
 
         button_cal_add.setConnectedEdges(ToggleButton::ConnectedOnLeft);
@@ -98,7 +99,7 @@ public:
         button_cal_add.onClick = [=]
         {
             double channels[CHANNEL_SIZE];
-            const auto pref = _app.get_int(L"combo_prefix");
+            const auto pref = _app.get_int(option_t::prefix);
 
             for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
             {
@@ -108,7 +109,7 @@ public:
                 channels[channel] = channel_text.getDoubleValue() * pow(10.0, pref);
             }
 
-            auto cals = _app.get_xml(L"calibrations");
+            auto cals = _app.get_xml(option_t::calibrations);
             if (cals == nullptr)
                 cals = std::make_unique<XmlElement>(StringRef(L"ROWS"));
 
@@ -121,7 +122,7 @@ public:
             e->setAttribute(Identifier(L"right"),       channels[RIGHT]);
             e->setAttribute(Identifier(L"right_coeff"), channels[RIGHT] / rms.at(RIGHT)); // todo: check for nan
 
-            _app.save(L"calibrations", cals.get());
+            _app.save(option_t::calibrations, cals.get());
             update();
         };
     }
@@ -133,7 +134,7 @@ public:
     void update()
     {
         rows.clear();
-        if (auto cals = _app.get_xml(L"calibrations")) {
+        if (auto cals = _app.get_xml(option_t::calibrations)) {
             forEachXmlChildElement(*cals, el)
             {
                 rows.push_back(cal_t{
@@ -145,7 +146,7 @@ public:
                 });
             }
         }
-        selected = _app.get_int(L"calibrations_index");
+        selected = _app.get_int(option_t::calibrations_index);
         table_cals.updateContent();
     };
 
@@ -164,7 +165,7 @@ public:
     void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на всём компоненте
         auto current = table_cals.getSelectedRow();
         selected = current == selected ? -1 : current;
-        _app.save(L"calibrations_index", selected);
+        _app.save(option_t::calibrations_index, selected);
         repaint();
     }
 
@@ -189,7 +190,7 @@ public:
 
     void paintCell(Graphics& g, int row, int column_id, int width, int height, bool /*selected*/) override
     {
-        auto data_selector = __columns.at(column_id - 1).type;
+        auto data_selector = _columns.at(column_id - 1).type;
         String text(theme::empty);
 
         switch (data_selector) {
@@ -239,7 +240,7 @@ public:
     // bug: ширина кнопок меняется скачками
     Component* refreshComponentForCell(int row, int column_id, bool /*selected*/, Component* component) override
     {
-        if (__columns.at(column_id - 1).type == cell_data_t::button)
+        if (_columns.at(column_id - 1).type == cell_data_t::button)
         {
             auto* button = static_cast<table_custom_button_*>(component);
             if (button == nullptr)
@@ -258,16 +259,16 @@ public:
         if (selected == del_row)
         {
             selected = -1;
-            _app.save(L"calibrations_index", selected);
+            _app.save(option_t::calibrations_index, selected);
         }
         else if (del_row < selected)
         {
             selected--;
-            _app.save(L"calibrations_index", selected);
+            _app.save(option_t::calibrations_index, selected);
         }
         table_cals.updateContent();
 
-        auto cals = _app.get_xml(L"calibrations");
+        auto cals = _app.get_xml(option_t::calibrations);
         if (cals == nullptr) {
             cals = std::make_unique<XmlElement>(StringRef(L"ROWS"));
             cals->createNewChildElement(StringRef(L"SELECTION"))->setAttribute(Identifier(L"cal_index"), -1);
@@ -283,7 +284,7 @@ public:
             e->setAttribute(Identifier(L"right"),       row.channel[RIGHT]);
             e->setAttribute(Identifier(L"right_coeff"), row.coeff  [RIGHT]);
         }
-        _app.save(L"calibrations", cals.get());
+        _app.save(option_t::calibrations, cals.get());
     }
 
 private:

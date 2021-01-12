@@ -28,6 +28,7 @@ application_::application_() {
 
 application_::~application_() {
     _theme.reset();
+    _settings.closeFiles();
 }
 
 theme::light_ *application_::get_theme() const {

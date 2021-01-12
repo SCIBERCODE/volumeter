@@ -1,17 +1,19 @@
 
-using controls_t = std::variant<std::shared_ptr<Label>, std::shared_ptr<ToggleButton>>;
-
-template <typename T>
-std::shared_ptr<T> __get(controls_t var)
-{
-    return *std::get_if<std::shared_ptr<T>>(&var);
-}
-
-//=================================================================================================
 class main_component_ : public AudioAppComponent,
                         public Timer {
 //=================================================================================================
 private:
+    const float _buff_size_list_sec[8] { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f, 30.0f };
+    const int   _tone_list[9]          { 10, 20, 200, 500, 1000, 2000, 5000, 10000, 20000 };
+
+    using controls_t = std::variant<std::shared_ptr<Label>, std::shared_ptr<ToggleButton>>;
+
+    template <typename T>
+    std::shared_ptr<T> _get(controls_t var)
+    {
+        return *std::get_if<std::shared_ptr<T>>(&var);
+    }
+
     Label                      label_device_type { { }, L"Type"        },
                                label_device      { { }, L"Device"      },
                                label_sample_rate { { }, L"Sample rate" },
@@ -47,34 +49,34 @@ public:
         addAndMakeVisible(combo_tone);
 
         label_buff_size.attachToComponent(&combo_buff_size, true);
-        for (const auto item : __buff_size_list_sec)
+        for (const auto item : _buff_size_list_sec)
             combo_buff_size.addItem(prefix(item, L"s", 0), static_cast<int>(item * 1000));
 
-        combo_buff_size.setSelectedId(_app.get_int(L"combo_buff_size"));
+        combo_buff_size.setSelectedId(_app.get_int(option_t::buff_size));
         combo_buff_size.onChange = [this]
         {
             auto value = combo_buff_size.getSelectedId();
             _signal.change_buff_size(value);
-            _app.save(L"combo_buff_size", value);
+            _app.save(option_t::buff_size, value);
             component_graph.start_waiting(buffer_fill, value);
         };
 
-        checkbox_tone.setToggleState(_app.get_int(L"checkbox_tone"), dontSendNotification);
+        checkbox_tone.setToggleState(_app.get_int(option_t::tone), dontSendNotification);
         checkbox_tone.setLookAndFeel(&theme_left_tick);
         checkbox_tone.onClick = [this]
         {
             _signal.extremes_clear();
-            _app.save(L"checkbox_tone", checkbox_tone.getToggleState());
+            _app.save(option_t::tone, checkbox_tone.getToggleState());
         };
-        for (const auto item : __tone_list)
+        for (const auto item : _tone_list)
             combo_tone.addItem(prefix(item, L"Hz", 0), item);
 
-        combo_tone.setSelectedId(_app.get_int(L"combo_tone"));
+        combo_tone.setSelectedId(_app.get_int(option_t::tone_value));
         combo_tone.onChange = [this]
         {
             auto value = combo_tone.getSelectedId();
             _signal.set_freq(value);
-            _app.save(L"combo_tone", value);
+            _app.save(option_t::tone_value, value);
         };
 
         /** =======================================================================================
@@ -90,7 +92,7 @@ public:
                         auto       checkbox     = std::make_shared<ToggleButton>();
                         auto&      props        = checkbox->getProperties();
                         const auto channel_name = __channel_name.at(line).toLowerCase();
-                        const auto option_name = L"graph_" + channel_name;
+                        const auto option_name = line == LEFT ? option_t::graph_left : option_t::graph_right;
 
                         checkbox->setButtonText(__channel_name.at(line));
                         checkbox->setLookAndFeel(&theme_left_tick);
@@ -99,7 +101,7 @@ public:
                         checkbox->setToggleState (_app.get_int(option_name), dontSendNotification);
                         checkbox->onClick = [=]
                         {
-                            if (auto control = __get<ToggleButton>(stat_controls[line][column]))
+                            if (auto control = _get<ToggleButton>(stat_controls[line][column]))
                                 _app.save(option_name, control->getToggleState());
                         };
 
@@ -153,28 +155,28 @@ public:
             component_graph.reset();
         };
 
-        button_pause_graph.setToggleState(_app.get_int(L"button_pause_graph"), dontSendNotification);
+        button_pause_graph.setToggleState(_app.get_int(option_t::graph_paused), dontSendNotification);
         button_pause_graph.onClick = [this]
         {
             auto value = button_pause_graph.getToggleState();
             button_pause_graph.setButtonText(value ? L"Resume graph" : L"Pause graph");
-            _app.save(L"button_pause_graph", value);
+            _app.save(option_t::graph_paused, value);
         };
 
         button_zero.onClick = [this]
         {
             auto value = button_zero.getToggleState();
-            _app.save(L"button_zero", value);
+            _app.save(option_t::zero, value);
             if (value)
                 _signal.zero_set();
             else
                 _signal.zero_clear();
         };
-        if (_app.get_int(L"button_zero")) {
+        if (_app.get_int(option_t::zero)) {
             button_zero.setToggleState(true, dontSendNotification);
             _signal.zero_set(
-                _app.get_text(L"zero_value_left" ).getDoubleValue(),
-                _app.get_text(L"zero_value_right").getDoubleValue()
+                _app.get_text(option_t::zero_value_left ).getDoubleValue(),
+                _app.get_text(option_t::zero_value_right).getDoubleValue()
             );
         }
 
@@ -218,14 +220,14 @@ public:
                 auto name_type = types.getUnchecked(i)->getTypeName();
                 combo_dev_types.addItem(name_type, i + 1);
 
-                if (name_type == _app.get_text(L"combo_dev_type"))
+                if (name_type == _app.get_text(option_t::device_type))
                     index = i;
             }
 
             combo_dev_types.setSelectedItemIndex(index);
             combo_dev_types.onChange = [this]
             {
-                _app.save(L"combo_dev_type", combo_dev_types.getText());
+                _app.save(option_t::device_type, combo_dev_types.getText());
                 auto type = deviceManager.getAvailableDeviceTypes()[combo_dev_types.getSelectedId() - 1];
                 if (type)
                 {
@@ -233,7 +235,7 @@ public:
                     const StringArray devs(type->getDeviceNames());
                     combo_dev_outputs.clear(dontSendNotification);
 
-                    auto device = _app.get_text(L"combo_dev_output");
+                    auto device = _app.get_text(option_t::device_name);
 
                     for (int i = 0; i < devs.size(); ++i) {
                         combo_dev_outputs.addItem(devs[i], i + 1);
@@ -250,8 +252,8 @@ public:
             _signal.clear_data();
             _signal.extremes_clear();
 
-            _app.save(L"combo_dev_output", combo_dev_outputs.getText());
-            auto sample_rate = _app.get_int(L"combo_dev_rate");
+            _app.save(option_t::device_name, combo_dev_outputs.getText());
+            auto sample_rate = _app.get_int(option_t::sample_rate);
 
             auto config                     = deviceManager.getAudioDeviceSetup();
             config.outputDeviceName         = combo_dev_outputs.getText();
@@ -273,7 +275,7 @@ public:
         };
         combo_dev_rates.onChange = [this]
         {
-            _app.save(L"combo_dev_rate", combo_dev_rates.getSelectedId());
+            _app.save(option_t::sample_rate, combo_dev_rates.getSelectedId());
             combo_dev_outputs.onChange();
         };
     }
@@ -288,7 +290,7 @@ public:
         combo_buff_size.onChange();
         _signal.prepare_to_play(sample_rate);
         component_filter.prepare_to_play(sample_rate);
-        component_graph.start_waiting(buffer_fill, _app.get_int(L"buff_size"));
+        component_graph.start_waiting(buffer_fill, _app.get_int(option_t::buff_size));
     }
 
     void getNextAudioBlock(const AudioSourceChannelInfo& buffer) override
@@ -349,18 +351,18 @@ public:
             for (size_t line_index = LEFT; line_index < VOLUME_SIZE; line_index++)
             {
                 if (line_index == LEFT || line_index == RIGHT) {
-                    if (auto checkbox = __get<ToggleButton>(stat_controls[line_index][LABEL]))
+                    if (auto checkbox = _get<ToggleButton>(stat_controls[line_index][LABEL]))
                         checkbox->setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin));
                 }
                 else {
-                    if (auto label_balance = __get<Label>(stat_controls[line_index][LABEL]))
+                    if (auto label_balance = _get<Label>(stat_controls[line_index][LABEL]))
                         label_balance->setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin - 3)); // todo: расположить в ряд без подгонки
                 }
 
-                if (auto label = __get<Label>(stat_controls[line_index][VALUE]))
+                if (auto label = _get<Label>(stat_controls[line_index][VALUE]))
                     label->setBounds(area.removeFromTop(theme::height));
 
-                if (auto label = __get<Label>(stat_controls[line_index][EXTREMES]))
+                if (auto label = _get<Label>(stat_controls[line_index][EXTREMES]))
                     label->setBounds(right.removeFromTop(theme::height));
 
                 remain.removeFromTop(theme::height);
@@ -415,11 +417,11 @@ public:
             if (isfinite(extremes[MIN])) printed[1] = print(extremes[MIN]);
             if (isfinite(extremes[MAX])) printed[2] = print(extremes[MAX]);
 
-            if (auto label = __get<Label>(stat_controls[line][VALUE])) {
+            if (auto label = _get<Label>(stat_controls[line][VALUE])) {
                 label->setText(printed[0], dontSendNotification);
                 label->setColour(Label::textColourId, isfinite(rms.at(line)) ? Colours::black : Colours::grey);
             }
-            if (auto label = __get<Label>(stat_controls[line][EXTREMES]))
+            if (auto label = _get<Label>(stat_controls[line][EXTREMES]))
                 label->setText(printed[1] + L" .. " + printed[2], dontSendNotification);
         }
 

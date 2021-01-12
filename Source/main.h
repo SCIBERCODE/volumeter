@@ -1,6 +1,9 @@
 
-const float __buff_size_list_sec[] { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f, 30.0f };
-const int   __tone_list         [] { 10, 20, 200, 500, 1000, 2000, 5000, 10000, 20000 };
+enum waiting_event_t
+{
+    device_init,
+    buffer_fill
+};
 
 const std::map<int, String> __prefs {
     { -15, L"f"      },
@@ -48,6 +51,31 @@ enum labels_stat_column_t : size_t {
     LABELS_STAT_COLUMN_SIZE
 };
 
+enum class option_t {
+    device_type,
+    device_name,
+    sample_rate,
+    buff_size,
+    tone,
+    tone_value,
+    zero,
+    zero_value_left,
+    zero_value_right,
+    graph_paused,
+    graph_left,
+    graph_right,
+    calibrate,
+    prefix,
+    calibrations,
+    calibrations_index,
+    pass_high,
+    pass_low,
+    pass_high_freq,
+    pass_low_freq,
+    pass_high_order,
+    pass_low_order,
+};
+
 template <typename T>
 void operator ++(T& value, int) // todo: проверить на вызовы с другими типами помимо перечислений, описанных выше
 {
@@ -71,7 +99,7 @@ class main_component_;
 //=================================================================================================
 class application_ : public JUCEApplication {
 //=================================================================================================
-protected:
+private:
     class main_window_ : public DocumentWindow
     {
     public:
@@ -84,63 +112,53 @@ protected:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(main_window_)
     };
 
-    struct option_t
+    struct option_names_t
     {
-        String xml_name;
-        String default_value;
+        const String& xml_name;
+        const String& default_value;
     };
 
-    const std::multimap<String, option_t> options {
-        { L"combo_dev_type",     { L"device_type",        L"ASIO"  } },
-        { L"combo_dev_output",   { L"device",             { }      } },
-        { L"combo_dev_rate",     { L"sample_rate",        L"44100" } },
-        { L"combo_buff_size",    { L"buff_size",          L"500"   } },
-        { L"checkbox_tone",      { L"tone",               L"0"     } },
-        { L"combo_tone",         { L"tone_value",         L"1000"  } },
-        { L"button_zero",        { L"zero",               L"0"     } },
-        { { },                   { L"zero_value_left",    L"0"     } },
-        { { },                   { L"zero_value_right",   L"0"     } },
+    const std::map<option_t, option_names_t> _options
+    {
+        { option_t::device_type,        { L"device_type",        L"ASIO"  } }, // combo_dev_type
+        { option_t::device_name,        { L"device",             { }      } }, // combo_dev_output
+        { option_t::sample_rate,        { L"sample_rate",        L"44100" } }, // combo_dev_rate
+        { option_t::buff_size,          { L"buff_size",          L"500"   } }, // combo_buff_size
+        { option_t::tone,               { L"tone",               L"0"     } }, // checkbox_tone
+        { option_t::tone_value,         { L"tone_value",         L"1000"  } }, // combo_tone
+        { option_t::zero,               { L"zero",               L"0"     } }, // button_zero
+        { option_t::zero_value_left,    { L"zero_value_left",    L"0"     } },
+        { option_t::zero_value_right,   { L"zero_value_right",   L"0"     } },
         // график
-        { L"button_pause_graph", { L"graph_paused",       L"0"     } },
-        { { },                   { L"graph_left",         L"1"     } },
-        { { },                   { L"graph_right",        L"0"     } },
+        { option_t::graph_paused,       { L"graph_paused",       L"0"     } }, // button_pause_graph
+        { option_t::graph_left,         { L"graph_left",         L"1"     } },
+        { option_t::graph_right,        { L"graph_right",        L"0"     } },
         // калибровка
-        { L"checkbox_cal",       { L"calibrate",          L"0"     } },
-        { L"combo_prefix",       { L"prefix",             L"0"     } },
-        { { },                   { L"calibrations",       { }      } },
-        { { },                   { L"calibrations_index", L"-1"    } },
+        { option_t::calibrate,          { L"calibrate",          L"0"     } }, // checkbox_cal
+        { option_t::prefix,             { L"prefix",             L"0"     } }, // combo_prefix
+        { option_t::calibrations,       { L"calibrations",       { }      } },
+        { option_t::calibrations_index, { L"calibrations_index", L"-1"    } },
         // фильтры
-        { { },                   { L"pass_high",          L"0"     } }, // todo: объединить в файле конфигурации
-        { { },                   { L"pass_low",           L"0"     } },
-        { { },                   { L"pass_high_freq",     { }      } },
-        { { },                   { L"pass_low_freq",      { }      } },
-        { { },                   { L"pass_high_order",    L"120"   } },
-        { { },                   { L"pass_low_order",     L"120"   } },
+        { option_t::pass_high,          { L"pass_high",          L"0"     } }, // todo: объединить в файле конфигурации
+        { option_t::pass_low,           { L"pass_low",           L"0"     } },
+        { option_t::pass_high_freq,     { L"pass_high_freq",     { }      } },
+        { option_t::pass_low_freq,      { L"pass_low_freq",      { }      } },
+        { option_t::pass_high_order,    { L"pass_high_order",    L"120"   } },
+        { option_t::pass_low_order,     { L"pass_low_order",     L"120"   } },
     };
 
-private:
     std::unique_ptr<main_window_>  _main_window;
     std::unique_ptr<theme::light_> _theme;
     ApplicationProperties          _settings;
 
-    /** поиск как по ключам, так и по строкам конфига, иначе говоря,
-        первые два столбца settings_::options имеют одинаковый вес при поиске,
-        но в порядке очерёдности
-    */
-    const option_t* get_option(const String& request) const {
-        auto find_key = options.find(request);
+    const option_names_t* find_xml_name(const option_t request) const
+    {
+        if (_options.count(request))
+            return &_options.at(request);
 
-        if (find_key != options.end() && find_key->first.isNotEmpty())
-            return &find_key->second;
-
-        auto find = find_if(options.begin(), options.end(),
-            [request](const auto& obj) { return obj.second.xml_name == request; });
-
-        if (find != options.end())
-            return &find->second;
-
-        return { };
+        return nullptr;
     }
+//=================================================================================================
 public:
     application_();
     ~application_() override;
@@ -154,15 +172,13 @@ public:
     theme::light_ *get_theme() const;
 
     template <typename T>
-    void save(const String& component_name, T value) {
-        if (auto option = get_option(component_name)) {
+    void save(const option_t option_name, T value) {
+        if (auto option = find_xml_name(option_name))
             _settings.getUserSettings()->setValue(option->xml_name, value);
-            _settings.saveIfNeeded();
-        }
     }
 
-    const String get_text(const String& component_name) {
-        if (auto option = get_option(component_name))
+    const String get_text(const option_t option_name) {
+        if (auto option = find_xml_name(option_name))
             return _settings.getUserSettings()->getValue
             (
                 option->xml_name,
@@ -172,16 +188,18 @@ public:
         return String();
     }
 
-    const int get_int(const String& component_name) {
-        auto str_value = get_text(component_name);
-        return str_value.isNotEmpty() ? str_value.getIntValue() : 0;
+    const int get_int(const option_t option_name) {
+        auto text_value = get_text(option_name);
+        return text_value.isNotEmpty() ? text_value.getIntValue() : 0;
     }
 
-    const auto get_xml(const String& component_name) {
-        if (auto option = get_option(component_name))
+    auto get_xml(const option_t option_name) {
+        if (auto option = find_xml_name(option_name))
             return _settings.getUserSettings()->getXmlValue(option->xml_name);
 
         return std::unique_ptr<XmlElement>{ };
     }
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(application_)
 };
 

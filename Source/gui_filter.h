@@ -1,17 +1,11 @@
 
-const int __order_list[] { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
-
-const std::pair<const wchar_t *, const wchar_t *> __type_text[FILTER_TYPE_SIZE]
-{
-    std::make_pair(L"High pass", L"pass_high"),
-    std::make_pair(L"Low pass" , L"pass_low" )
-};
-
 // bug: самовозбуд стейнберга при выкрученной громкости на lpf 15000
-//=================================================================================================
+
 class component_filter_ : public Component {
 //=================================================================================================
 private:
+    const int _order_list[14] { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
+
     theme::checkbox_right_tick_      theme_right;
     GroupComponent                   group        { { }, L"Filter(s)" };
     std::unique_ptr<ToggleButton>    checkbox_type[FILTER_TYPE_SIZE];
@@ -21,16 +15,18 @@ private:
 
     signal_                        & _signal;
     application_                   & _app;
+//=================================================================================================
 public:
 
-    component_filter_(application_& app, signal_& signal) : _signal(signal), _app(app)
+    component_filter_(application_& app, signal_& signal) :
+        _signal(signal), _app(app)
     // todo: component_filter_(shared_ptr<signal_> signal) : signal(move(signal))
     {
         addAndMakeVisible(group);
 
         for (auto type = HIGH_PASS; type < FILTER_TYPE_SIZE; type++)
         {
-            checkbox_type[type] = std::make_unique<ToggleButton>(__type_text[type].first);
+            checkbox_type[type] = std::make_unique<ToggleButton>(type == HIGH_PASS ? L"High pass" : L"Low pass");
             label_desc   [type] = std::make_unique<Label>();
             edit_freq    [type] = std::make_unique<TextEditor>();
             combo_order  [type] = std::make_unique<ComboBox>();
@@ -40,7 +36,9 @@ public:
             auto edit   = edit_freq    [type].get();
             auto combo  = combo_order  [type].get();
 
-            auto option = String(__type_text[type].second);
+            const auto option       = type == HIGH_PASS ? option_t::pass_high       : option_t::pass_low;
+            const auto option_freq  = type == HIGH_PASS ? option_t::pass_high_freq  : option_t::pass_low_freq;
+            const auto option_order = type == HIGH_PASS ? option_t::pass_high_order : option_t::pass_low_order;
 
             addAndMakeVisible(button);
             addAndMakeVisible(label);
@@ -62,7 +60,7 @@ public:
             auto check_input = [&](ToggleButton *check, String value_str)
             {
                 auto value_int = value_str.getIntValue();
-                auto enabled = value_int > 0 && value_int <= _app.get_int(L"sample_rate") / 2;
+                auto enabled = value_int > 0 && value_int <= _app.get_int(option_t::sample_rate) / 2;
                 check->setEnabled(enabled);
                 if (!enabled) check->setToggleState(false, sendNotification);
                 return enabled;
@@ -72,25 +70,25 @@ public:
             {
                 auto value = edit_freq[type]->getText();
                 if (check_input(checkbox_type[type].get(), value) || value.isEmpty()) {
-                    _app.save(option + L"_freq", value);
+                    _app.save(option_freq, value);
                     signal.filter_init(type);
                 }
             };
 
             edit->setInputRestrictions(0, L"0123456789.");
-            auto value = _app.get_text(option + L"_freq");
+            auto value = _app.get_text(option_freq);
             if (check_input(button, value))
                 edit->setText(value, true);
 
             // порядок фильтра
-            for (auto const item : __order_list)
+            for (auto const item : _order_list)
                 combo->addItem(String(item), item);
 
-            combo->setSelectedId(_app.get_int(option + L"_order"), dontSendNotification);
+            combo->setSelectedId(_app.get_int(option_order), dontSendNotification);
             combo->onChange = [&, type, option]
             {
                 auto value = combo_order[type]->getSelectedId();
-                _app.save(option + L"_order", value);
+                _app.save(option_order, value);
                 signal.set_order(type, value);
                 signal.filter_init(type);
             };
