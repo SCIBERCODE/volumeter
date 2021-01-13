@@ -20,20 +20,19 @@ public:
 
     void set_freq(const float frequency)
     {
-        _frequency = frequency;
-        auto cycles_per_sample = frequency / _sample_rate;
-        _angle_delta = cycles_per_sample * 2.0 * M_PI;
+        _frequency   = frequency;
+        _angle_delta = (frequency / _sample_rate) * 2.0 * M_PI;
     }
 
     auto sample(const channel_t channel)
     {
-        auto current_sample = sin(_angles[channel]);
+        auto new_sample = sin(_angles[channel]);
         _angles[channel] += _angle_delta;
 
         if (_angles[channel] > 2.0 * M_PI)
             _angles[channel] -= 2.0 * M_PI;
 
-        return static_cast<float>(current_sample);
+        return static_cast<float>(new_sample);
     }
 };
 
@@ -53,8 +52,6 @@ private:
         size_t    size;
         size_t    pointer;
         channel_t channel;
-        double    coeff;
-        double    zero;
     };
 
     std::unique_ptr<value_t[]> _buffers[CHANNEL_SIZE];
@@ -63,12 +60,10 @@ private:
     iterator_t                 _it;
     uint64_t                   _index { };
     bool                       _full  { }; // как минимум единажды буфер был заполнен
-    bool                       _volts;
-    application_             & _app;
 //=================================================================================================
 public:
-    circle_(application_& app, const size_t max_size) :
-        _app(app), _max_size(max_size)
+    circle_(const size_t max_size) :
+        _max_size(max_size)
     {
         for (auto& buffer : _buffers)
             buffer = std::make_unique<value_t[]>(_max_size);
@@ -82,7 +77,7 @@ public:
             if (_buffers[line])
                 for (size_t k = 0; k < _max_size; k++)
                 {
-                    _buffers[line][k].value_raw = std::numeric_limits<double>::quiet_NaN();
+                    _buffers[line][k].value_raw = _NAN<double>;
                     _buffers[line][k].index     = 0;
                 }
 
@@ -105,8 +100,9 @@ public:
         }
     }
 
-    auto is_full () const { return _full;  }
-    auto is_volts() const { return _volts; }
+    auto is_full () const {
+        return _full;
+    }
 
     auto get_tail(const channel_t channel) const {
         return _buffers[channel][_tails[channel]].value_raw;
@@ -140,43 +136,13 @@ public:
     /** начало цикла извлечения значений буфера, в дальнейшем вызывается circle_::get_next_value
         @param index уникальный идентификатор значения в буфере
     */
-    bool get_first_value(const channel_t channel, const size_t size, double& value) {
-        if (size == 0 || size > _max_size || _tails[channel] == 0)/* bug: исправить логику */
+    bool get_first_value(const channel_t channel, const size_t size, double& value) { // todo: объединить функции в одну
+        if (size == 0 || size > _max_size || _tails[channel] == 0) /* bug: исправить логику */
             return false;
 
         _it.pointer = _tails[channel] - 1;
         _it.size    = size;
         _it.channel = channel;
-
-        _it.coeff   = std::numeric_limits<double>::quiet_NaN();
-        _it.zero    = std::numeric_limits<double>::quiet_NaN();
-
-        size_t cal_index = _app.get_int(option_t::calibrations_index);
-        if (cal_index != -1 && _app.get_int(option_t::calibrate))
-        {
-            size_t k = 0;
-            if (auto cals = _app.get_xml(option_t::calibrations)) {
-                forEachXmlChildElement(*cals, el)
-                {
-                    if (k == cal_index) {
-                        if (_it.channel == LEFT)
-                            _it.coeff = el->getDoubleAttribute(Identifier(L"left_coeff"));
-                        else
-                            _it.coeff = el->getDoubleAttribute(Identifier(L"right_coeff"));
-                        break;
-                    }
-                    k++;
-                }
-            }
-        }
-
-        if (_app.get_int(option_t::zero))
-            if (_it.channel == LEFT)
-                _it.zero = _app.get_text(option_t::zero_value_left).getDoubleValue();
-            else
-                _it.zero = _app.get_text(option_t::zero_value_right).getDoubleValue();
-
-        _volts = isfinite(_it.coeff);
         return get_next_value(value);
     }
 
@@ -184,14 +150,10 @@ public:
         @return о завершении сообщается возвратом false
     */
     bool get_next_value(double& value) {
-        value_t result;
-
-        result.value_raw = std::numeric_limits<double>::quiet_NaN();
-        result.index     = 0;
-
+        value = _NAN<double>;
         if (_it.pointer >= 0 && _it.size)
         {
-            result = _buffers[_it.channel][_it.pointer];
+            value = _buffers[_it.channel][_it.pointer].value_raw;
             if (_it.pointer == 0)
                 _it.pointer = _max_size - 1;
             else
@@ -199,27 +161,17 @@ public:
 
             _it.size--;
         };
-        if (!isfinite(result.value_raw))
+        if (!isfinite(value))
             _it = { };
-        else {
-            // bug: не менять данные графика, всю работу производить в get_extremes
-            if (isfinite(_it.coeff))
-                value = result.value_raw * _it.coeff;
-            else {
-                value = 20 * log10(result.value_raw);
-                if (isfinite(_it.zero))
-                    value -= _it.zero; // bug: подскакивает граф, не норм
-            }
-        }
 
-        return isfinite(result.value_raw);
+        return isfinite(value);
     }
 
-    auto get_extremes(const channel_t channel, const size_t size) {
+    auto get_extremes(const channel_t channel, const size_t window_size) {
         auto   result = std::make_unique<double[]>(EXTREMES_SIZE);
         double value;
 
-        if (get_first_value(channel, size, value)) {
+        if (get_first_value(channel, window_size, value)) {
             result[MIN] = value;
             result[MAX] = value;
             do {
@@ -264,8 +216,8 @@ public:
     }
 
     void zero_set(
-        double value_left  = std::numeric_limits<double>::quiet_NaN(),
-        double value_right = std::numeric_limits<double>::quiet_NaN())
+        double value_left  = _NAN<double>,
+        double value_right = _NAN<double>)
     {
         std::lock_guard<std::mutex> locker(_locker);
         if (isfinite(value_left) && isfinite(value_right)) {
@@ -312,7 +264,7 @@ public:
     void extremes_clear() {
         for (auto& line : _extremes)
             for (auto& column : line)
-                column = std::numeric_limits<double>::quiet_NaN();
+                column = _NAN<double>;
     }
 
     static double gain2db(const double gain) {
@@ -328,7 +280,7 @@ public:
         std::lock_guard<std::mutex> locker(_locker);
         if (new_size && _sample_rate) {
             auto number_of_samples = static_cast<size_t>(new_size / (1000.0 / _sample_rate));
-            _buff = std::make_unique<circle_>(_app, number_of_samples);
+            _buff = std::make_unique<circle_>(number_of_samples);
         }
     }
 

@@ -1,4 +1,6 @@
 
+// todo: выбор порядка точности
+
 class main_component_ : public AudioAppComponent,
                         public Timer {
 //=================================================================================================
@@ -19,7 +21,7 @@ private:
                                label_sample_rate { { }, L"Sample rate" },
                                label_buff_size   { { }, L"Buff size"   };
     ToggleButton               checkbox_tone     {      L"Tone"        };
-    TooltipWindow              hint              { this                };
+    TooltipWindow              hint              { this, 500           };
 
     component_calibration_     component_calibration;
     component_filter_          component_filter;
@@ -96,7 +98,7 @@ public:
 
                         checkbox->setButtonText(__channel_name.at(line));
                         checkbox->setLookAndFeel(&theme_left_tick);
-                        checkbox->setTooltip(L"Show " + channel_name + L" channel on the graph");
+                        checkbox->setTooltip(L"Show the " + channel_name + L" channel on the graph");
 
                         checkbox->setToggleState (_app.get_int(option_name), dontSendNotification);
                         checkbox->onClick = [=]
@@ -119,7 +121,7 @@ public:
                         addAndMakeVisible(*label);
                     }
                 }
-                else // создание лабелов с данными и экстремумами
+                else // создание надписей с данными и экстремумами
                 { // todo: сработка соответствующих галочек при нажатии на цифры показометра
                     auto label = std::make_shared<Label>();
 
@@ -281,25 +283,27 @@ public:
     }
 
     //=============================================================================================
-    // переопределённые методы
+    // juce callbacks
 
-    void releaseResources() override { }
+    void releaseResources() override {
+        //=========================================================================================
+    }
 
-    void prepareToPlay(const int /*samples_per_block*/, const double sample_rate) override
-    {
+    void prepareToPlay(const int /*samples_per_block*/, const double sample_rate) override {
+        //=========================================================================================
         combo_buff_size.onChange();
         _signal.prepare_to_play(sample_rate);
         component_filter.prepare_to_play(sample_rate);
         component_graph.start_waiting(buffer_fill, _app.get_int(option_t::buff_size));
     }
 
-    void getNextAudioBlock(const AudioSourceChannelInfo& buffer) override
-    {
+    void getNextAudioBlock(const AudioSourceChannelInfo& buffer) override {
+        //=========================================================================================
         _signal.next_audio_block(buffer);
     }
 
-    void resized() override // todo: широкое окно
-    {
+    void resized() override { // todo: широкое окно
+        //=========================================================================================
         auto area = getLocalBounds().reduced(theme::margin * 2);
         auto combo_with_label = [&](ComboBox& combo)
         {
@@ -380,31 +384,21 @@ public:
         }
     }
 
-    void timerCallback() override
-    {
-        std::function<String(double)> print; // todo: центровать цифры по точке
+    void timerCallback() override {
+        //=========================================================================================
         auto rms = _signal.get_rms();
         if (rms.size() == 0) return;
 
         if (component_graph.is_waiting())
             component_graph.stop_waiting();
 
-        component_graph.enqueue(LEFT,  rms.at(LEFT ));
-        component_graph.enqueue(RIGHT, rms.at(RIGHT));
-
-        auto calibrate = component_calibration.is_active();
-        if (calibrate)
+        for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
         {
-            rms.at(LEFT ) *= component_calibration.get_coeff(LEFT ); // bug: при неучтённом префиксе
-            rms.at(RIGHT) *= component_calibration.get_coeff(RIGHT);
-            print = prefix_v;
+            component_graph.enqueue(channel, rms.at(channel));
+            rms.at(channel) = _app.do_corrections(channel, rms.at(channel));
         }
-        else {
-            rms.at(LEFT ) = _signal.gain2db(rms.at(LEFT )) - _signal.zero_get(LEFT );
-            rms.at(RIGHT) = _signal.gain2db(rms.at(RIGHT)) - _signal.zero_get(RIGHT);
-            print = [ ](double value) { return String(value, 3) + L" dB"; };
-        }
-        rms.push_back(abs(rms.at(LEFT) - rms.at(RIGHT)));
+
+        rms.push_back(abs(rms.at(LEFT) - rms.at(RIGHT))); // баланс вычисляется после всех корректировок
         _signal.extremes_set(rms);
 
         String printed[3];
@@ -413,9 +407,9 @@ public:
             std::fill_n(printed, _countof(printed), theme::empty);
             auto extremes = _signal.extremes_get(line);
 
-            if (isfinite(rms.at(line)))  printed[0] = print(rms.at(line));
-            if (isfinite(extremes[MIN])) printed[1] = print(extremes[MIN]);
-            if (isfinite(extremes[MAX])) printed[2] = print(extremes[MAX]);
+            if (isfinite(rms.at(line)))  printed[0] = _app.print(rms.at(line));
+            if (isfinite(extremes[MIN])) printed[1] = _app.print(extremes[MIN]);
+            if (isfinite(extremes[MAX])) printed[2] = _app.print(extremes[MAX]);
 
             if (auto label = _get<Label>(stat_controls[line][VALUE])) {
                 label->setText(printed[0], dontSendNotification);
@@ -423,12 +417,6 @@ public:
             }
             if (auto label = _get<Label>(stat_controls[line][EXTREMES]))
                 label->setText(printed[1] + L" .. " + printed[2], dontSendNotification);
-        }
-
-        if (button_zero.isEnabled() == calibrate) {
-            // todo: ноль на вольтах
-            button_zero.setToggleState(false, sendNotificationSync);
-            button_zero.setEnabled(!calibrate);
         }
     }
 

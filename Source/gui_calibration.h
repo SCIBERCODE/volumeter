@@ -24,7 +24,7 @@ private:
         { cell_data_t::name,   L"Name",  300 },
         { cell_data_t::left,   L"Left",  100 },
         { cell_data_t::right,  L"Right", 100 },
-        { cell_data_t::button, L"",      30  }
+        { cell_data_t::button, L"",      30  } // todo: не растягивать при ресайзе
     };
 
     std::vector<cal_t> rows;
@@ -68,7 +68,7 @@ public:
 
         size_t id = 0;
         for (auto const& column : _columns)
-            table_cals.getHeader().addColumn(column.header, ++id, column.width, 30, -1, TableHeaderComponent::notSortable);
+            table_cals.getHeader().addColumn(column.header, ++id, column.width, 30, -1, TableHeaderComponent::notSortable); // todo: реализовать сортировку
 
         addAndMakeVisible(label_cal_add);
         addAndMakeVisible(editor_cal_name); // todo: национальные символы
@@ -80,7 +80,16 @@ public:
             addAndMakeVisible(editor);
             editor.setTextToShowWhenEmpty(L"0.0", Colours::grey); // todo: менять префикс в подсказке пустого поля в зависимости от выбора единицы измерения
             editor.setInputRestrictions(0, L"0123456789.");
+
+            editor.onTextChange = [this] {
+                auto enabled =
+                    editor_cal_channels[0].getText().length() &&
+                    editor_cal_channels[1].getText().length();
+                button_cal_add.setEnabled(enabled);
+                button_cal_add.setTooltip(enabled ? L"" : L"You must enter values for both channels!");
+            };
         }
+        editor_cal_channels[0].onTextChange();
 
         label_cal_add.attachToComponent(&editor_cal_name, true);
         label_cal_channels.attachToComponent(&editor_cal_channels[LEFT], true);
@@ -127,10 +136,6 @@ public:
         };
     }
 
-    auto is_active() {
-        return checkbox_cal.getToggleState() && selected != -1;
-    }
-
     void update()
     {
         rows.clear();
@@ -152,104 +157,6 @@ public:
 
     double get_coeff(const channel_t channel) {
         return selected == -1 ? 1.0 : rows.at(selected).coeff[channel];
-    }
-
-    void selectedRowsChanged(int) { }
-    void mouseMove(const MouseEvent &) override { }
-    void sortOrderChanged(const int, const bool) override { }
-
-    void backgroundClicked(const MouseEvent &) {
-        table_cals.deselectAllRows();
-    }
-
-    void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на всём компоненте
-        auto current = table_cals.getSelectedRow();
-        selected = current == selected ? -1 : current;
-        _app.save(option_t::calibrations_index, selected);
-        repaint();
-    }
-
-    int getNumRows() override {
-        return static_cast<int>(rows.size());
-    }
-
-    void paintRowBackground(Graphics& g, int row, int width, int height, bool is_selected) override {
-        auto bg_color = getLookAndFeel().findColour(ListBox::backgroundColourId)
-            .interpolatedWith(getLookAndFeel().findColour(ListBox::textColourId), 0.03f);
-
-        if (row == selected)
-            bg_color = Colours::silver.withAlpha(0.7f);
-        if (is_selected)
-            bg_color = Colours::silver.withAlpha(0.5f);
-
-        g.fillAll(bg_color);
-
-        if (row == selected)
-            g.drawRect(0, 0, width, height);
-    }
-
-    void paintCell(Graphics& g, int row, int column_id, int width, int height, bool /*selected*/) override
-    {
-        auto data_selector = _columns.at(column_id - 1).type;
-        String text(theme::empty);
-
-        switch (data_selector) {
-        case cell_data_t::name:  text = rows.at(row).name;                            break;
-        case cell_data_t::left:  text = prefix(rows.at(row).channel[LEFT],  L"V", 0); break;
-        case cell_data_t::right: text = prefix(rows.at(row).channel[RIGHT], L"V", 0); break;
-        }
-
-        auto text_color = getLookAndFeel().findColour(ListBox::textColourId);
-        auto bg_color   = getLookAndFeel().findColour(ListBox::backgroundColourId);
-
-        g.setColour(text_color);
-        g.setFont(12.5f);
-        g.drawText(text, 2, 0, width - 4, height, Justification::centredLeft, true);
-    }
-
-    void resized() override {
-        auto area = getLocalBounds().reduced(theme::margin * 2);
-        area.removeFromTop   (theme::margin * 3);
-
-        auto bottom = area.removeFromBottom(theme::height * 2 + theme::margin);
-        auto line = bottom.removeFromBottom(theme::height);
-        line.removeFromLeft(theme::label_width);
-        button_cal_add.setBounds(line.removeFromRight(theme::button_width));
-        auto edit_width = line.getWidth() / 3;
-        editor_cal_channels[LEFT].setBounds(line.removeFromLeft(edit_width - 5));
-        line.removeFromLeft(theme::margin);
-        editor_cal_channels[RIGHT].setBounds(line.removeFromLeft(edit_width - 5));
-        line.removeFromLeft(theme::margin); // bug: на этой границе положение меняется скачками
-        line.removeFromRight(theme::margin);
-        combo_prefix.setBounds(line);
-
-        bottom.removeFromBottom(theme::margin);
-        bottom.removeFromLeft(theme::label_width);
-        editor_cal_name.setBounds(bottom.removeFromBottom(theme::height));
-        area.removeFromBottom(theme::margin);
-        table_cals.setBounds(area);
-
-        group.setBounds(getLocalBounds());
-        _app.get_theme()->set_header_checkbox_bounds(checkbox_cal);
-    }
-
-    size_t get_table_height() {
-        return table_cals.getHeight();
-    }
-
-    // bug: ширина кнопок меняется скачками
-    Component* refreshComponentForCell(int row, int column_id, bool /*selected*/, Component* component) override
-    {
-        if (_columns.at(column_id - 1).type == cell_data_t::button)
-        {
-            auto* button = static_cast<table_custom_button_*>(component);
-            if (button == nullptr)
-                button = std::make_unique<table_custom_button_>(*this).release();
-
-            button->set_row(row);
-            return button;
-        }
-        return nullptr;
     }
 
     void delete_row(const int del_row)
@@ -287,6 +194,104 @@ public:
         _app.save(option_t::calibrations, cals.get());
     }
 
+    //=============================================================================================
+    // juce callbacks
+
+    void backgroundClicked(const MouseEvent &) {
+        //=========================================================================================
+        table_cals.deselectAllRows();
+    }
+
+    void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на всём компоненте
+        //=========================================================================================
+        auto current = table_cals.getSelectedRow();
+        selected = current == selected ? -1 : current;
+        _app.save(option_t::calibrations_index, selected);
+        repaint();
+    }
+
+    int getNumRows() override {
+        //=========================================================================================
+        return static_cast<int>(rows.size());
+    }
+
+    void paintRowBackground(Graphics& g, int row, int width, int height, bool is_selected) override {
+        //=========================================================================================
+        auto bg_color = getLookAndFeel().findColour(ListBox::backgroundColourId)
+            .interpolatedWith(getLookAndFeel().findColour(ListBox::textColourId), 0.03f);
+
+        if (row == selected)
+            bg_color = Colours::silver.withAlpha(0.7f);
+        if (is_selected)
+            bg_color = Colours::silver.withAlpha(0.5f);
+
+        g.fillAll(bg_color);
+
+        if (row == selected)
+            g.drawRect(0, 0, width, height);
+    }
+
+    void paintCell(Graphics& g, int row, int column_id, int width, int height, bool /*is_selected*/) override {
+        //=========================================================================================
+        auto data_selector = _columns.at(column_id - 1).type;
+        String text(theme::empty);
+
+        switch (data_selector) {
+        case cell_data_t::name:  text = rows.at(row).name;                            break;
+        case cell_data_t::left:  text = prefix(rows.at(row).channel[LEFT],  L"V", 0); break;
+        case cell_data_t::right: text = prefix(rows.at(row).channel[RIGHT], L"V", 0); break;
+        }
+
+        auto text_color = getLookAndFeel().findColour(ListBox::textColourId);
+        auto bg_color   = getLookAndFeel().findColour(ListBox::backgroundColourId);
+
+        g.setColour(text_color);
+        g.setFont(12.5f);
+        g.drawText(text, 2, 0, width - 4, height, Justification::centredLeft, true);
+    }
+
+    void resized() override {
+        //=========================================================================================
+        auto area = getLocalBounds().reduced(theme::margin * 2);
+        area.removeFromTop   (theme::margin * 3);
+
+        auto bottom = area.removeFromBottom(theme::height * 2 + theme::margin);
+        auto line = bottom.removeFromBottom(theme::height);
+        line.removeFromLeft(theme::label_width);
+        button_cal_add.setBounds(line.removeFromRight(theme::button_width));
+        auto edit_width = line.getWidth() / 3;
+        editor_cal_channels[LEFT].setBounds(line.removeFromLeft(edit_width - 5));
+        line.removeFromLeft(theme::margin);
+        editor_cal_channels[RIGHT].setBounds(line.removeFromLeft(edit_width - 5));
+        line.removeFromLeft(theme::margin); // bug: на этой границе положение меняется скачками
+        line.removeFromRight(theme::margin);
+        combo_prefix.setBounds(line);
+
+        bottom.removeFromBottom(theme::margin);
+        bottom.removeFromLeft(theme::label_width);
+        editor_cal_name.setBounds(bottom.removeFromBottom(theme::height));
+        area.removeFromBottom(theme::margin);
+        table_cals.setBounds(area);
+
+        group.setBounds(getLocalBounds());
+        _app.get_theme()->set_header_checkbox_bounds(checkbox_cal);
+    }
+
+    // bug: ширина кнопок меняется скачками
+    Component* refreshComponentForCell(int row, int column_id, bool /*is_selected*/, Component* component) override {
+        //=========================================================================================
+        if (_columns.at(column_id - 1).type == cell_data_t::button)
+        {
+            auto* button = static_cast<table_custom_button_*>(component);
+            if (button == nullptr)
+                button = std::make_unique<table_custom_button_>(*this).release();
+
+            button->set_row(row);
+            return button;
+        }
+        return nullptr;
+    }
+//=================================================================================================
 private:
     class table_custom_button_ : public Component
     {
@@ -295,10 +300,11 @@ private:
         TextButton              button;
         int                     row;
     public:
-        table_custom_button_(component_calibration_& owner_) : owner(owner_)
+        table_custom_button_(component_calibration_& owner_) : owner(owner_) // todo: при курсоре над кнопкой подсвечивать строку
         {
             addAndMakeVisible(button);
             button.setButtonText(L"X");
+            button.setTooltip(L"Remove this calibration");
             button.setConnectedEdges(TextButton::ConnectedOnBottom | TextButton::ConnectedOnLeft | TextButton::ConnectedOnRight | TextButton::ConnectedOnTop);
             button.onClick = [this]
             {

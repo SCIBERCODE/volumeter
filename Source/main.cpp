@@ -83,10 +83,6 @@ const String prefix(const double value, const wchar_t *unit, const size_t numder
     return String(new_value, static_cast<int>(numder_of_decimals)) + L" " + symbol + String(unit);
 }
 
-const String prefix_v(const double value) {
-    return prefix(value, L"V", 5);
-}
-
 const bool is_about_equal(const float a, const float b) {
     return fabs(a - b) <= ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * FLT_EPSILON);
 }

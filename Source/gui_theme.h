@@ -34,7 +34,7 @@ namespace theme
             setColour(Slider::textBoxBackgroundColourId, white);
             setColour(ResizableWindow::backgroundColourId, bg);
 
-            setColour(TooltipWindow::backgroundColourId, white);
+            setColour(TooltipWindow::backgroundColourId, Colours::lightyellow);
             setColour(TooltipWindow::outlineColourId, black);
             setColour(TooltipWindow::textColourId, black);
         }

@@ -5,7 +5,7 @@ enum waiting_event_t
     buffer_fill
 };
 
-const std::map<int, String> __prefs {
+const std::map<int, String> __prefs { // todo: проверить на отсутствующих префиксах (или расставить assert?)
     { -15, L"f"      },
     { -12, L"p"      },
     {  -9, L"n"      },
@@ -87,6 +87,9 @@ void operator --(channel_t& value, int)
     value = value == 0 ? CHANNEL_SIZE : static_cast<channel_t>(value - 1);
 }
 
+template <class T>
+constexpr T _NAN = std::numeric_limits<T>::quiet_NaN(); // NAN
+
 //=================================================================================================
 const String prefix  (double value, const wchar_t *unit, size_t numder_of_decimals);
 const String prefix_v(double value);
@@ -158,6 +161,13 @@ private:
 
         return nullptr;
     }
+
+    double _coeff { _NAN<double> };
+    double _zero  { _NAN<double> };
+
+    auto gain2db(const double gain) {
+        return 20 * log10(gain);
+    }
 //=================================================================================================
 public:
     application_();
@@ -198,6 +208,59 @@ public:
             return _settings.getUserSettings()->getXmlValue(option->xml_name);
 
         return std::unique_ptr<XmlElement>{ };
+    }
+
+    void get_current_coef(channel_t channel, double& coeff, double& zero) {
+        coeff = _NAN<double>;
+        zero  = _NAN<double>;
+
+        size_t cal_index = get_int(option_t::calibrations_index);
+        if (cal_index != -1 && get_int(option_t::calibrate))
+        {
+            size_t k = 0;
+            if (auto cals = get_xml(option_t::calibrations)) {
+                forEachXmlChildElement(*cals, el)
+                {
+                    if (k == cal_index) {
+                        if (channel == LEFT)
+                            coeff = el->getDoubleAttribute(Identifier(L"left_coeff"));
+                        else
+                            coeff = el->getDoubleAttribute(Identifier(L"right_coeff"));
+                        break;
+                    }
+                    k++;
+                }
+            }
+        }
+        if (get_int(option_t::zero))
+            if (channel == LEFT)
+                zero = get_text(option_t::zero_value_left).getDoubleValue();
+            else
+                zero = get_text(option_t::zero_value_right).getDoubleValue();
+    }
+
+    const auto do_corrections(channel_t channel, const double raw_value) { // bug: регулярно, но не всегда есть характерный v-образный провал в первой экране графика
+        auto result = _NAN<double>;
+
+        get_current_coef(channel, _coeff, _zero);
+
+        if (isfinite(_coeff))
+            result = raw_value * _coeff;
+        else {
+            result = gain2db(raw_value);
+            if (isfinite(_zero))
+                result -= _zero;
+        }
+        return result;
+    }
+
+    const String print(const double corrected_value) {
+        get_current_coef(LEFT, _coeff, _zero);
+
+        if (isfinite(_coeff))
+            return prefix(corrected_value, L"V", 5); // todo: выравнивать по еденице измерения
+
+        return String(corrected_value, 3) + L" dB"; // todo: выравнивать по точке
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(application_)

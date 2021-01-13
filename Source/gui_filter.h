@@ -51,27 +51,28 @@ public:
             button->onClick = [&, type, option]
             {
                 _app.save(option, checkbox_type[type]->getToggleState());
-                signal.filter_init(type);
+                _signal.filter_init(type);
             };
             // поле для ввода частоты
             label->setText("Freq/Order", dontSendNotification);
             label->setJustificationType(Justification::centredRight);
 
-            auto check_input = [&](ToggleButton *check, String value_str)
+            auto check_input = [this](ToggleButton *check, String value_text)
             {
-                auto value_int = value_str.getIntValue();
+                auto value_int = value_text.getIntValue();
                 auto enabled = value_int > 0 && value_int <= _app.get_int(option_t::sample_rate) / 2;
                 check->setEnabled(enabled);
+                check->setTooltip(enabled ? L"" : L"The frequency value must be entered!");
                 if (!enabled) check->setToggleState(false, sendNotification);
                 return enabled;
             };
 
-            edit->onTextChange = [&, type, option]
+            edit->onTextChange = [this, type, option_freq, check_input]
             {
                 auto value = edit_freq[type]->getText();
                 if (check_input(checkbox_type[type].get(), value) || value.isEmpty()) {
                     _app.save(option_freq, value);
-                    signal.filter_init(type);
+                    _signal.filter_init(type);
                 }
             };
 
@@ -89,14 +90,17 @@ public:
             {
                 auto value = combo_order[type]->getSelectedId();
                 _app.save(option_order, value);
-                signal.set_order(type, value);
-                signal.filter_init(type);
+                _signal.set_order(type, value);
+                _signal.filter_init(type);
             };
         }
     }
 
-    void resized() override
-    {
+    //=============================================================================================
+    // juce callbacks
+
+    void resized() override {
+        //=========================================================================================
         auto area = getLocalBounds().reduced(theme::margin);
         area.removeFromTop(theme::height + theme::margin);
         for (auto type = HIGH_PASS; type < FILTER_TYPE_SIZE; type++)
@@ -115,8 +119,8 @@ public:
         group.setBounds(getLocalBounds());
     }
 
-    void prepare_to_play(const double sample_rate)
-    {
+    void prepare_to_play(const double sample_rate) {
+        //=========================================================================================
         auto max_freq = sample_rate / 2;
         auto empty_message = "1 .. " + String(max_freq, 0) + L" Hz";
         for (auto& edit : edit_freq)

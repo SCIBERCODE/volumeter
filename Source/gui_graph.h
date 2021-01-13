@@ -2,6 +2,10 @@
 // bug: провалы вверх при переключении фильтра
 //         ! и, соответственно, вниз при частично заполненном буфере, что происходит при переключении параметров
 
+// todo: регулировка масштаба с галкой автомасштрабирования
+//       скорость движения графика
+//       сглаживание
+
 class component_graph_ : public Component,
                          public Timer {
 //=================================================================================================
@@ -15,26 +19,25 @@ private:
     {
         tone,
         zero,
-        //calibration, // todo: пересчитывать все значения, график не должен визуально изменяться
+        calibration,
         high_pass,
         low_pass
     };
     struct waiting_t
     {
-        bool                         running = false;
-        const size_t                 timer_value_ms = 100;   // интервал обновления на экране и одновременного декремента остатка таймера
-        size_t                       remain_ms;              // декремент остатка
-        size_t                       interval_ms;            // полное время ожидания
-        double                       progress_value = -1.0;  // переменная в диапазоне 0.0 .. 1.0, отслеживаемая ProgressBar контролом
+        bool                         running        { };
+        const size_t                 timer_value_ms { 100  }; // интервал обновления на экране и одновременного декремента остатка таймера
+        size_t                       remain_ms;               // декремент остатка
+        size_t                       interval_ms;             // полное время ожидания
+        double                       progress_value { -1.0 }; // переменная в диапазоне 0.0 .. 1.0, отслеживаемая ProgressBar контролом
         std::unique_ptr<ProgressBar> progress_bar;
-        std::unique_ptr<Label>       stub_bg;                // полупрозрачная заливка
+        std::unique_ptr<Label>       stub_bg;                 // полупрозрачная заливка
         std::unique_ptr<Label>       stub_text;
         waiting_event_t              event;
     };
 
     Rectangle<int>            _plot;
     Rectangle<int>            _plot_indented;
-    std::unique_ptr<double[]> _extremes;
     std::unique_ptr<circle_>  _graph_data; // bug: очищать при смене устройства
     RectangleList<int>        _placed_extremes;
     waiting_t                 _wait;
@@ -71,7 +74,7 @@ public:
         for (const auto& display : Desktop::getInstance().getDisplays().displays)
             display_width += display.userArea.getWidth();
 
-        _graph_data = std::make_unique<circle_>(_app, display_width);
+        _graph_data = std::make_unique<circle_>(display_width);
     }
 
     void enqueue(const channel_t channel, const double value_raw) {
@@ -128,7 +131,7 @@ public:
         {
             if (!isfinite(value)) break;
             auto x = _plot.getRight() - offset;
-            auto y = static_cast<float>(-value);// *(_plot_indented.getHeight() / abs(_extremes[MIN] - _extremes[MAX])));
+            auto y = static_cast<float>(-value);
             if (path.isEmpty())
                 path.startNewSubPath(x, y);
 
@@ -175,29 +178,23 @@ public:
     void draw_extremes(const channel_t channel, Graphics& g) {
         //=========================================================================================
         double value;
+        String text[2];
+        auto   width    = _plot.getWidth();
+        auto   extremes = _graph_data->get_extremes(channel, width);
+
         for (auto extremum = MIN; extremum < EXTREMES_SIZE; extremum++)
         {
-            size_t offset = 0;
-            if (!_graph_data->get_first_value(channel, _plot.getWidth(), value))
+            if (!_graph_data->get_first_value(channel, width, value))
                 continue;
 
-            auto volts = _graph_data->is_volts();
-            String text[2];
-
-            for ( ; ; offset++)
+            for (size_t offset = 0; ; offset++) // todo: ! оптимизация, хранить смещение и возвращать с get_extremes, вместо попиксельного поиска
             {
                 //if (round_flt(value) == round_flt(_extremes[extremum]))
                 //if (is_about_equal(value, _extremes[extremum]))
 
                 // todo: ! избавиться от индусского кода
-                if (volts) {
-                    text[0] = prefix(value, L"V", 3);
-                    text[1] = prefix(_extremes[extremum], L"V", 3);
-                }
-                else {
-                    text[0] = String(value, 3) + L" dB";
-                    text[1] = String(_extremes[extremum], 3) + L" dB";
-                }
+                text[0] = _app.print(_app.do_corrections(channel, value));
+                text[1] = _app.print(_app.do_corrections(channel, extremes[extremum]));
 
                 if (text[0] == text[1])
                 {
@@ -228,7 +225,7 @@ public:
                     if (channel == RIGHT)
                         _placed_extremes.add(rect);
 
-                    break; // todo: несколько ключевых частот, в зависимости от свободного места
+                    break; // todo: несколько ключевых частот, в зависимости от свободного места (наи-большая/меньшая выделяется шрифтом или фоном)
                 }
                 if (!_graph_data->get_next_value(value))
                     break;
@@ -239,8 +236,8 @@ public:
         }
     }
 
-    /** расшифровка цветов графика, в настоящий момент используется подсветка названия канала
-        вместо заграмождения полей графика
+    /** расшифровка цветов графика (в настоящий момент используется подсветка названия канала
+        вместо заграмождения полей графика)
     */
     void draw_legend(Graphics& g) {
         //=========================================================================================
@@ -295,12 +292,15 @@ public:
     }
 
     //=============================================================================================
+    // juce callbacks
+
     void resized() override {
         //=========================================================================================
         auto area         = getLocalBounds();
         auto text         = get_timer_text(_wait.event); // максимальной шириной считаем первую по порядку строку
-        auto text_w       = _wait.stub_text->getFont().getStringWidth(text);
-        auto text_h       = roundToInt(_wait.stub_text->getFont().getHeight());
+        auto text_f       = _wait.stub_text->getFont();
+        auto text_w       = text_f.getStringWidth(text);
+        auto text_h       = roundToInt(text_f.getHeight());
         auto area_text    = area.withSizeKeepingCentre(text_w, text_h);
 
         _wait.stub_bg     ->setBounds(area);
@@ -308,7 +308,6 @@ public:
         _wait.progress_bar->setBounds(area_text.withCentre(Point<int>(area_text.getCentreX(), area_text.getY() + text_h + theme::margin * 2)));
     }
 
-    //=============================================================================================
     void paint(Graphics& g) override {
         //=========================================================================================
         _plot          = getLocalBounds();
@@ -326,8 +325,6 @@ public:
             if (channel == LEFT  && _app.get_int(option_t::graph_left ) == 0) continue;
             if (channel == RIGHT && _app.get_int(option_t::graph_right) == 0) continue;
 
-            _extremes = _graph_data->get_extremes(channel, _plot.getWidth());
-
             draw_graph_line(channel, g);
             draw_extremes  (channel, g);
         }
@@ -335,7 +332,8 @@ public:
         g.drawRect(_plot);
     }
 
-    //=============================================================================================
+    /** обновление таймера на заглушке ожидания
+    */
     void timerCallback() override {
         //=========================================================================================
         _wait.stub_text->setText(get_timer_text(_wait.event), dontSendNotification);
