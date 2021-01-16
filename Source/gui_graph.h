@@ -6,8 +6,8 @@
 //       скорость движения графика
 //       сглаживание
 
-class component_graph_ : public Component,
-                         public Timer {
+class component_graph : public Component,
+                        public Timer {
 //=================================================================================================
 private:
     struct range_t
@@ -36,16 +36,16 @@ private:
         waiting_event_t              event;
     };
 
-    Rectangle<int>            _plot;
-    Rectangle<int>            _plot_indented;
-    std::unique_ptr<circle_>  _graph_data; // bug: очищать при смене устройства
-    RectangleList<int>        _placed_extremes;
-    waiting_t                 _wait;
-    signal_                 & _signal;
-    application_            & _app;
+    Rectangle<int>                   _plot;
+    Rectangle<int>                   _plot_indented;
+    std::unique_ptr<circular_buffer> _graph_data; // bug: очищать при смене устройства
+    RectangleList<int>               _placed_extremes;
+    waiting_t                        _wait;
+    signal                         & _signal;
+    application                    & _app;
 //=================================================================================================
 public:
-    component_graph_(application_ &app, signal_ &signal) :
+    component_graph(application &app, signal &signal) :
         _signal(signal), _app(app)
     {
         reset();
@@ -67,14 +67,15 @@ public:
         addAndMakeVisible(_wait.stub_text.get());
         addAndMakeVisible(_wait.progress_bar.get());
     }
-    ~component_graph_() { }
+
+    ~component_graph() { }
 
     void reset() {
         auto display_width = 0;
         for (const auto& display : Desktop::getInstance().getDisplays().displays)
             display_width += display.userArea.getWidth();
 
-        _graph_data = std::make_unique<circle_>(display_width);
+        _graph_data = std::make_unique<circular_buffer>(display_width);
     }
 
     void enqueue(const channel_t channel, const double value_raw) {
@@ -99,6 +100,7 @@ public:
         resized();
         startTimer(_wait.timer_value_ms);
     }
+
     void stop_waiting() {
         _wait.running     = false;
         _wait.stub_bg     ->setVisible(false);
@@ -107,6 +109,7 @@ public:
         _wait.progress_bar->setVisible(false);
         stopTimer();
     }
+
     bool is_waiting() {
         return _wait.running;
     }
@@ -352,6 +355,6 @@ public:
     }
 
 private:
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(component_graph_)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(component_graph)
 };
 

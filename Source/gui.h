@@ -1,8 +1,8 @@
 
 // todo: выбор порядка точности
 
-class main_component_ : public AudioAppComponent,
-                        public Timer {
+class main_component : public AudioAppComponent,
+                       public Timer {
 //=================================================================================================
 private:
     const float _buff_size_list_sec[8] { 0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f, 30.0f };
@@ -16,31 +16,30 @@ private:
         return *std::get_if<std::shared_ptr<T>>(&var);
     }
 
+    signal                    _signal;
+    application             & _app;
+    component_calibration     _component_calibration;
+    component_filter          _component_filter;
+    component_graph           _component_graph;
+    theme::checkbox_left_tick _theme_left_tick; // должно быть объявлено раньше stat_controls
+
     Label                      label_device_type { { }, L"Type"        },
                                label_device      { { }, L"Device"      },
                                label_sample_rate { { }, L"Sample rate" },
                                label_buff_size   { { }, L"Buff size"   };
     ToggleButton               checkbox_tone     {      L"Tone"        };
     TooltipWindow              hint              { this, 500           };
-
-    component_calibration_     component_calibration;
-    component_filter_          component_filter;
-    component_graph_           component_graph;
-    theme::checkbox_left_tick_ theme_left_tick; // должно быть объявлено раньше stat_controls
     TextButton                 button_stat_reset, button_pause_graph, button_zero;
     ComboBox                   combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
     controls_t                 stat_controls[VOLUME_SIZE][LABELS_STAT_COLUMN_SIZE];
-
-    signal_                    _signal;
-    application_             & _app;
 //=================================================================================================
 public:
-    main_component_(application_& app) :
-        component_calibration(app, _signal),
-        component_filter     (app, _signal),
-        component_graph      (app, _signal),
-        _signal              (app         ),
-        _app                 (app         )
+    main_component(application& app) :
+        _component_calibration(app, _signal),
+        _component_filter     (app, _signal),
+        _component_graph      (app, _signal),
+        _signal               (app         ),
+        _app                  (app         )
     {
         load_devices();
 
@@ -60,11 +59,11 @@ public:
             auto value = combo_buff_size.getSelectedId();
             _signal.change_buff_size(value);
             _app.save(option_t::buff_size, value);
-            component_graph.start_waiting(buffer_fill, value);
+            _component_graph.start_waiting(waiting_event_t::buffer_fill, value);
         };
 
         checkbox_tone.setToggleState(_app.get_int(option_t::tone), dontSendNotification);
-        checkbox_tone.setLookAndFeel(&theme_left_tick);
+        checkbox_tone.setLookAndFeel(&_theme_left_tick);
         checkbox_tone.onClick = [this]
         {
             _signal.extremes_clear();
@@ -97,7 +96,7 @@ public:
                         const auto option_name = line == LEFT ? option_t::graph_left : option_t::graph_right;
 
                         checkbox->setButtonText(__channel_name.at(line));
-                        checkbox->setLookAndFeel(&theme_left_tick);
+                        checkbox->setLookAndFeel(&_theme_left_tick);
                         checkbox->setTooltip(L"Show the " + channel_name + L" channel on the graph");
 
                         checkbox->setToggleState (_app.get_int(option_name), dontSendNotification);
@@ -154,7 +153,7 @@ public:
         button_stat_reset.onClick = [this]
         {
             _signal.extremes_clear();
-            component_graph.reset();
+            _component_graph.reset();
         };
 
         button_pause_graph.setToggleState(_app.get_int(option_t::graph_paused), dontSendNotification);
@@ -182,10 +181,10 @@ public:
             );
         }
 
-        addAndMakeVisible(component_graph);
-        addAndMakeVisible(component_filter);
-        addAndMakeVisible(component_calibration);
-        component_calibration.update();
+        addAndMakeVisible(_component_graph);
+        addAndMakeVisible(_component_filter);
+        addAndMakeVisible(_component_calibration);
+        _component_calibration.update();
 
         setSize(430, 790);
         startTimer(100);
@@ -193,7 +192,7 @@ public:
         setAudioChannels(2, 2);
     }
 
-    ~main_component_() override
+    ~main_component() override
     {
         shutdownAudio();
         checkbox_tone.setLookAndFeel(nullptr);
@@ -293,8 +292,8 @@ public:
         //=========================================================================================
         combo_buff_size.onChange();
         _signal.prepare_to_play(sample_rate);
-        component_filter.prepare_to_play(sample_rate);
-        component_graph.start_waiting(buffer_fill, _app.get_int(option_t::buff_size));
+        _component_filter.prepare_to_play(sample_rate);
+        _component_graph.start_waiting(waiting_event_t::buffer_fill, _app.get_int(option_t::buff_size));
     }
 
     void getNextAudioBlock(const AudioSourceChannelInfo& buffer) override {
@@ -334,9 +333,9 @@ public:
         {
             area.removeFromBottom(theme::margin);
             // фильтр
-            component_filter.setBounds(area.removeFromBottom(95));
+            _component_filter.setBounds(area.removeFromBottom(95));
             area.removeFromBottom(theme::margin);
-            component_calibration.setBounds(area.removeFromBottom(250));
+            _component_calibration.setBounds(area.removeFromBottom(250));
 
             // stat
             area.removeFromBottom(theme::margin * 2);
@@ -380,7 +379,7 @@ public:
             }
             remain.removeFromTop(theme::margin);
             remain.removeFromBottom(theme::margin);
-            component_graph.setBounds(remain);
+            _component_graph.setBounds(remain);
         }
     }
 
@@ -389,12 +388,12 @@ public:
         auto rms = _signal.get_rms();
         if (rms.size() == 0) return;
 
-        if (component_graph.is_waiting())
-            component_graph.stop_waiting();
+        if (_component_graph.is_waiting())
+            _component_graph.stop_waiting();
 
         for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
         {
-            component_graph.enqueue(channel, rms.at(channel));
+            _component_graph.enqueue(channel, rms.at(channel));
             rms.at(channel) = _app.do_corrections(channel, rms.at(channel));
         }
 
@@ -421,6 +420,6 @@ public:
     }
 
 private:
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_component_)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (main_component)
 };
 

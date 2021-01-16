@@ -9,14 +9,15 @@
 
 #include "gui_theme.h"
 #include "main.h"
+#include "circular_buffer.h"
 #include "signal.h"
 #include "gui_filter.h"
 #include "gui_calibration.h"
 #include "gui_graph.h"
 #include "gui.h"
 
-application_::application_() {
-    _theme = std::make_unique<theme::light_>();
+application::application() {
+    _theme = std::make_unique<theme::light>();
 
     PropertiesFile::Options params;
     params.applicationName = L"volumeter";
@@ -26,33 +27,34 @@ application_::application_() {
     _settings.setStorageParameters(params);
 }
 
-application_::~application_() {
+application::~application() {
     _theme.reset();
     _settings.closeFiles();
 }
 
-theme::light_ *application_::get_theme() const {
+theme::light *application::get_theme() const {
     return _theme.get();
 }
 
-void application_::initialise(const String&)
+void application::initialise(const String&)
 {
     Desktop::getInstance().setDefaultLookAndFeel(_theme.get());
-    _main_window = std::make_unique<main_window_>(L"rms volumeter", *this);
+    _main_window = std::make_unique<main_window>(L"rms volumeter", *this);
 }
 
-const String application_::getApplicationName()        { return L"rms_volumeter";    }
-const String application_::getApplicationVersion()     { return __DATE__;            }
-bool  application_::moreThanOneInstanceAllowed()       { return true;                }
-void  application_::shutdown()                         { _main_window = nullptr;     }
-void  application_::main_window_::closeButtonPressed() { _app.systemRequestedQuit(); }
+const String application::getApplicationName()       { return L"rms_volumeter";    }
+const String application::getApplicationVersion()    { return __DATE__;            }
+bool  application::moreThanOneInstanceAllowed()      { return true;                }
+void  application::shutdown()                        { _main_window = nullptr;     }
+void  application::main_window::closeButtonPressed() { _app.systemRequestedQuit(); }
+      application::main_window::~main_window()       { }
 
 //=================================================================================================
-application_::main_window_::main_window_(const String& name, application_& app) :
+application::main_window::main_window(const String& name, application& app) :
     DocumentWindow(name, app.get_theme()->get_bg_color(), DocumentWindow::allButtons),
     _app(app)
 {
-    _content = std::make_unique<main_component_>(app);
+    _content = std::make_unique<main_component>(app);
 
     setUsingNativeTitleBar(false);
     setTitleBarTextCentred(true);
@@ -91,5 +93,5 @@ const bool round_flt(const float value) {
     return round(value * 10000.0f) / 10000.0f;
 }
 
-START_JUCE_APPLICATION(application_)
+START_JUCE_APPLICATION(application)
 

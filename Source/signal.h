@@ -1,5 +1,5 @@
 
-class sin_ {
+class sine {
 //=================================================================================================
 private:
     double
@@ -9,6 +9,9 @@ private:
         _angles[CHANNEL_SIZE] { };
 
 public:
+    sine () { }
+    ~sine() { }
+
     void set_sample_rate(const double sample_rate) {
         _sample_rate = sample_rate;
     }
@@ -36,177 +39,24 @@ public:
     }
 };
 
-/** круговой буфер
-*/
-class circle_ {
+class signal {
 //=================================================================================================
 private:
-    struct value_t
-    {
-        double   value_raw;
-        uint64_t index;
-    };
-
-    struct iterator_t
-    {
-        size_t    size;
-        size_t    pointer;
-        channel_t channel;
-    };
-
-    std::unique_ptr<value_t[]> _buffers[CHANNEL_SIZE];
-    size_t                     _tails  [CHANNEL_SIZE];
-    const size_t               _max_size;
-    iterator_t                 _it;
-    uint64_t                   _index { };
-    bool                       _full  { }; // как минимум единажды буфер был заполнен
-//=================================================================================================
-public:
-    circle_(const size_t max_size) :
-        _max_size(max_size)
-    {
-        for (auto& buffer : _buffers)
-            buffer = std::make_unique<value_t[]>(_max_size);
-
-        clear();
-    }
-
-    void clear()
-    {
-        for (auto line = LEFT; line < CHANNEL_SIZE; line++) {
-            if (_buffers[line])
-                for (size_t k = 0; k < _max_size; k++)
-                {
-                    _buffers[line][k].value_raw = _NAN<double>;
-                    _buffers[line][k].index     = 0;
-                }
-
-            _tails[line] = 0;
-        }
-    }
-
-    void enqueue(const channel_t channel, const double value)
-    {
-        if (_max_size && isfinite(value) && _buffers[channel])
-        {
-            auto& new_value  = _buffers[channel][_tails[channel]];
-            _tails[channel] = (_tails[channel] + 1) % _max_size;
-
-            if (_tails[channel] == 0)
-                _full = true;
-
-            new_value.value_raw = value;
-            new_value.index     = _index++;
-        }
-    }
-
-    auto is_full () const {
-        return _full;
-    }
-
-    auto get_tail(const channel_t channel) const {
-        return _buffers[channel][_tails[channel]].value_raw;
-    }
-
-    bool get_rms(std::array<double, VOLUME_SIZE>& rms) const
-    {
-        double sum [CHANNEL_SIZE] { };
-        size_t size[CHANNEL_SIZE] { };
-
-        for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
-            for (size_t k = 0; k < _max_size; ++k)
-            {
-                auto value = _buffers[channel][k];
-                if (isfinite(value.value_raw)) {
-                    sum [channel] += value.value_raw;
-                    size[channel]++;
-                }
-            }
-
-        if (size[LEFT] && size[RIGHT] && _full) {
-            rms[LEFT   ] = sqrt(sum[LEFT ] / size[LEFT ]);
-            rms[RIGHT  ] = sqrt(sum[RIGHT] / size[RIGHT]);
-            rms[BALANCE] = abs (sum[LEFT ] - sum[RIGHT]);
-            return true;
-        }
-        else
-            return false;
-    }
-
-    /** начало цикла извлечения значений буфера, в дальнейшем вызывается circle_::get_next_value
-        @param index уникальный идентификатор значения в буфере
-    */
-    bool get_first_value(const channel_t channel, const size_t size, double& value) { // todo: объединить функции в одну
-        if (size == 0 || size > _max_size || _tails[channel] == 0) /* bug: исправить логику */
-            return false;
-
-        _it.pointer = _tails[channel] - 1;
-        _it.size    = size;
-        _it.channel = channel;
-        return get_next_value(value);
-    }
-
-    /** извлечение значений буфера
-        @return о завершении сообщается возвратом false
-    */
-    bool get_next_value(double& value) {
-        value = _NAN<double>;
-        if (_it.pointer >= 0 && _it.size)
-        {
-            value = _buffers[_it.channel][_it.pointer].value_raw;
-            if (_it.pointer == 0)
-                _it.pointer = _max_size - 1;
-            else
-                _it.pointer--;
-
-            _it.size--;
-        };
-        if (!isfinite(value))
-            _it = { };
-
-        return isfinite(value);
-    }
-
-    auto get_extremes(const channel_t channel, const size_t window_size) {
-        auto   result = std::make_unique<double[]>(EXTREMES_SIZE);
-        double value;
-
-        if (get_first_value(channel, window_size, value)) {
-            result[MIN] = value;
-            result[MAX] = value;
-            do {
-                if (!isfinite(value)) break;
-                result[MIN] = std::min(value, result[MIN]);
-                result[MAX] = std::max(value, result[MAX]);
-            }
-            while (get_next_value(value));
-        }
-       return result;
-    }
-
-private:
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(circle_)
-
-};
-
-//=================================================================================================
-class signal_ {
-//=================================================================================================
-private:
-    double                   _sample_rate;
-    std::mutex               _locker;
-    sin_                     _sin;
-    std::unique_ptr<circle_> _buff;
+    double        _sample_rate;
+    std::mutex    _locker;
+    sine          _sine;
+    std::unique_ptr<circular_buffer>
+                  _buff;
     std::unique_ptr<spuce::iir<spuce::float_type, spuce::float_type>>
-                             _filters [CHANNEL_SIZE][FILTER_TYPE_SIZE];
-    size_t                   _orders                [FILTER_TYPE_SIZE];
-    double                   _extremes[VOLUME_SIZE ][EXTREMES_SIZE   ];
-    double                   _zeros   [CHANNEL_SIZE];
-    application_           & _app;
+                  _filters [CHANNEL_SIZE][FILTER_TYPE_SIZE];
+    size_t        _orders                [FILTER_TYPE_SIZE];
+    double        _extremes[VOLUME_SIZE ][EXTREMES_SIZE   ];
+    double        _zeros   [CHANNEL_SIZE];
+    application & _app;
 //=================================================================================================
 public:
 
-    signal_(application_& app) : _app(app)
+    signal(application& app) : _app(app)
     {
         _sample_rate       = _app.get_int(option_t::sample_rate    );
         _orders[HIGH_PASS] = _app.get_int(option_t::pass_high_order);
@@ -214,6 +64,8 @@ public:
 
         zero_clear();
     }
+
+    ~signal() { }
 
     void zero_set(
         double value_left  = _NAN<double>,
@@ -272,15 +124,15 @@ public:
     }
 
     void set_freq(const double freq) {
-        _sin.set_freq(static_cast<float>(freq));
-        _sin.reset();
+        _sine.set_freq(static_cast<float>(freq));
+        _sine.reset();
     }
 
     void change_buff_size(const int new_size) {
         std::lock_guard<std::mutex> locker(_locker);
         if (new_size && _sample_rate) {
             auto number_of_samples = static_cast<size_t>(new_size / (1000.0 / _sample_rate));
-            _buff = std::make_unique<circle_>(number_of_samples);
+            _buff = std::make_unique<circular_buffer>(number_of_samples);
         }
     }
 
@@ -327,9 +179,9 @@ public:
     {
         _sample_rate = sample_rate;
 
-        _sin.set_sample_rate(_sample_rate);
-        _sin.set_freq(static_cast<float>(_app.get_int(option_t::tone_value)));
-        _sin.reset();
+        _sine.set_sample_rate(_sample_rate);
+        _sine.set_freq(static_cast<float>(_app.get_int(option_t::tone_value)));
+        _sine.reset();
 
         filter_init(HIGH_PASS);
         filter_init(LOW_PASS );
@@ -353,7 +205,7 @@ public:
                         _buff->enqueue(channel, read[channel][sample_index] * read[channel][sample_index]);
                         if (use_high_pass || use_low_pass || use_tone)
                         {
-                            spuce::float_type sample = use_tone ? _sin.sample(channel) : read[channel][sample_index];
+                            spuce::float_type sample = use_tone ? _sine.sample(channel) : read[channel][sample_index];
                             if (use_high_pass) sample = _filters[channel][HIGH_PASS]->clock(sample);
                             if (use_low_pass)  sample = _filters[channel][LOW_PASS ]->clock(sample);
                             write[channel][sample_index] = static_cast<float>(sample);
@@ -368,6 +220,6 @@ public:
     }
 
 private:
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(signal_)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(signal)
 };
 

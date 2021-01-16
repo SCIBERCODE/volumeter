@@ -1,6 +1,6 @@
 
-class component_calibration_ : public Component,
-                               public TableListBoxModel {
+class component_calibration : public Component,
+                              public TableListBoxModel {
 //=================================================================================================
 private:
     enum class cell_data_t { name, left, right, button };
@@ -27,24 +27,24 @@ private:
         { cell_data_t::button, L"",      30  } // todo: не растягивать при ресайзе
     };
 
-    std::vector<cal_t> rows;
-    int                selected = -1;
-    GroupComponent     group;
-    ToggleButton       checkbox_cal       {      L"Use Calibration" };
-    Label              label_cal_add      { { }, L"Name"            },
-                       label_cal_channels { { }, L"Left/Right"      };
-    TableListBox       table_cals;
-    TextEditor         editor_cal_name;
-    TextEditor         editor_cal_channels[CHANNEL_SIZE];
-    ComboBox           combo_prefix;
-    TextButton         button_cal_add;
+    signal           & _signal; // todo: использовать умные указатели
+    application      & _app;
+    std::vector<cal_t> _rows;
+    int                _selected { -1 };
 
-    signal_          & _signal; // todo: использовать умные указатели
-    application_     & _app;
+    GroupComponent      group;
+    ToggleButton        checkbox_cal       {      L"Use Calibration" };
+    Label               label_cal_add      { { }, L"Name"            },
+                        label_cal_channels { { }, L"Left/Right"      };
+    TableListBox        table_cals;
+    TextEditor          editor_cal_name;
+    TextEditor          editor_cal_channels[CHANNEL_SIZE];
+    ComboBox            combo_prefix;
+    TextButton          button_cal_add;
 //=================================================================================================
 public:
 
-    component_calibration_(application_ &app, signal_ &signal) :
+    component_calibration(application &app, signal &signal) :
         _signal(signal), _app(app)
     {
         addAndMakeVisible(group);
@@ -136,13 +136,15 @@ public:
         };
     }
 
+    ~component_calibration() { }
+
     void update()
     {
-        rows.clear();
+        _rows.clear();
         if (auto cals = _app.get_xml(option_t::calibrations)) {
             forEachXmlChildElement(*cals, el)
             {
-                rows.push_back(cal_t{
+                _rows.push_back(cal_t{
                     el->getStringAttribute(Identifier(L"name")),
                     el->getDoubleAttribute(Identifier(L"left")),
                     el->getDoubleAttribute(Identifier(L"right")),
@@ -151,27 +153,27 @@ public:
                 });
             }
         }
-        selected = _app.get_int(option_t::calibrations_index);
+        _selected = _app.get_int(option_t::calibrations_index);
         table_cals.updateContent();
     };
 
     double get_coeff(const channel_t channel) {
-        return selected == -1 ? 1.0 : rows.at(selected).coeff[channel];
+        return _selected == -1 ? 1.0 : _rows.at(_selected).coeff[channel];
     }
 
     void delete_row(const int del_row)
     {
-        rows.erase(rows.begin() + del_row);
+        _rows.erase(_rows.begin() + del_row);
 
-        if (selected == del_row)
+        if (_selected == del_row)
         {
-            selected = -1;
-            _app.save(option_t::calibrations_index, selected);
+            _selected = -1;
+            _app.save(option_t::calibrations_index, _selected);
         }
-        else if (del_row < selected)
+        else if (del_row < _selected)
         {
-            selected--;
-            _app.save(option_t::calibrations_index, selected);
+            _selected--;
+            _app.save(option_t::calibrations_index, _selected);
         }
         table_cals.updateContent();
 
@@ -182,7 +184,7 @@ public:
         }
         cals->deleteAllChildElements();
 
-        for (const auto& row : rows)
+        for (const auto& row : _rows)
         {
             auto* e = cals->createNewChildElement(StringRef(L"ROW"));
             e->setAttribute(Identifier(L"name"),        row.name);
@@ -205,14 +207,14 @@ public:
     void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на всём компоненте
         //=========================================================================================
         auto current = table_cals.getSelectedRow();
-        selected = current == selected ? -1 : current;
-        _app.save(option_t::calibrations_index, selected);
+        _selected = current == _selected ? -1 : current;
+        _app.save(option_t::calibrations_index, _selected);
         repaint();
     }
 
     int getNumRows() override {
         //=========================================================================================
-        return static_cast<int>(rows.size());
+        return static_cast<int>(_rows.size());
     }
 
     void paintRowBackground(Graphics& g, int row, int width, int height, bool is_selected) override {
@@ -220,14 +222,14 @@ public:
         auto bg_color = getLookAndFeel().findColour(ListBox::backgroundColourId)
             .interpolatedWith(getLookAndFeel().findColour(ListBox::textColourId), 0.03f);
 
-        if (row == selected)
+        if (row == _selected)
             bg_color = Colours::silver.withAlpha(0.7f);
         if (is_selected)
             bg_color = Colours::silver.withAlpha(0.5f);
 
         g.fillAll(bg_color);
 
-        if (row == selected)
+        if (row == _selected)
             g.drawRect(0, 0, width, height);
     }
 
@@ -237,9 +239,9 @@ public:
         String text(theme::empty);
 
         switch (data_selector) {
-        case cell_data_t::name:  text = rows.at(row).name;                            break;
-        case cell_data_t::left:  text = prefix(rows.at(row).channel[LEFT],  L"V", 0); break;
-        case cell_data_t::right: text = prefix(rows.at(row).channel[RIGHT], L"V", 0); break;
+        case cell_data_t::name:  text = _rows.at(row).name;                            break;
+        case cell_data_t::left:  text = prefix(_rows.at(row).channel[LEFT],  L"V", 0); break;
+        case cell_data_t::right: text = prefix(_rows.at(row).channel[RIGHT], L"V", 0); break;
         }
 
         auto text_color = getLookAndFeel().findColour(ListBox::textColourId);
@@ -282,9 +284,9 @@ public:
         //=========================================================================================
         if (_columns.at(column_id - 1).type == cell_data_t::button)
         {
-            auto* button = static_cast<table_custom_button_*>(component);
+            auto* button = static_cast<table_custom_button*>(component);
             if (button == nullptr)
-                button = std::make_unique<table_custom_button_>(*this).release();
+                button = std::make_unique<table_custom_button>(*this).release();
 
             button->set_row(row);
             return button;
@@ -293,33 +295,37 @@ public:
     }
 //=================================================================================================
 private:
-    class table_custom_button_ : public Component
+    class table_custom_button : public Component
     {
     private:
-        component_calibration_& owner;
-        TextButton              button;
-        int                     row;
+        component_calibration& _owner;
+        TextButton             _button;
+        int                    _row;
     public:
-        table_custom_button_(component_calibration_& owner_) : owner(owner_) // todo: при курсоре над кнопкой подсвечивать строку
+        table_custom_button(component_calibration& owner) : _owner(owner) // todo: при курсоре над кнопкой подсвечивать строку
         {
-            addAndMakeVisible(button);
-            button.setButtonText(L"X");
-            button.setTooltip(L"Remove this calibration");
-            button.setConnectedEdges(TextButton::ConnectedOnBottom | TextButton::ConnectedOnLeft | TextButton::ConnectedOnRight | TextButton::ConnectedOnTop);
-            button.onClick = [this]
+            addAndMakeVisible(_button);
+            _button.setButtonText(L"X");
+            _button.setTooltip(L"Remove this calibration");
+            _button.setConnectedEdges(TextButton::ConnectedOnBottom | TextButton::ConnectedOnLeft | TextButton::ConnectedOnRight | TextButton::ConnectedOnTop);
+            _button.onClick = [this]
             {
-                owner.delete_row(row);
+                _owner.delete_row(_row);
             };
         }
+
+        ~table_custom_button() { }
+
         void resized() override {
-            button.setBoundsInset(BorderSize<int>(2));
+            _button.setBoundsInset(BorderSize<int>(2));
         }
+
         void set_row(const int new_row) {
-            row = new_row;
+            _row = new_row;
         }
     private:
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(table_custom_button_)
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(table_custom_button)
     };
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(component_calibration_)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(component_calibration)
 };
 

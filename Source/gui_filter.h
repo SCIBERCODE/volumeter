@@ -1,26 +1,26 @@
 
 // bug: самовозбуд стейнберга при выкрученной громкости на lpf 15000
 
-class component_filter_ : public Component {
+class component_filter : public Component {
 //=================================================================================================
 private:
     const int _order_list[14] { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
 
-    theme::checkbox_right_tick_      theme_right;
+    signal                        & _signal;
+    application                   & _app;
+    theme::checkbox_right_tick      _theme_right;
+
     GroupComponent                   group        { { }, L"Filter(s)" };
     std::unique_ptr<ToggleButton>    checkbox_type[FILTER_TYPE_SIZE];
     std::unique_ptr<Label>           label_desc   [FILTER_TYPE_SIZE];
     std::unique_ptr<TextEditor>      edit_freq    [FILTER_TYPE_SIZE];
     std::unique_ptr<ComboBox>        combo_order  [FILTER_TYPE_SIZE];
-
-    signal_                        & _signal;
-    application_                   & _app;
 //=================================================================================================
 public:
 
-    component_filter_(application_& app, signal_& signal) :
+    component_filter(application& app, signal& signal) :
         _signal(signal), _app(app)
-    // todo: component_filter_(shared_ptr<signal_> signal) : signal(move(signal))
+    // todo: component_filter(shared_ptr<signal> signal) : signal(move(signal))
     {
         addAndMakeVisible(group);
 
@@ -47,7 +47,7 @@ public:
 
             // галка включения фильтра
             button->setToggleState(_app.get_int(option), dontSendNotification);
-            button->setLookAndFeel(&theme_right);
+            button->setLookAndFeel(&_theme_right);
             button->onClick = [&, type, option]
             {
                 _app.save(option, checkbox_type[type]->getToggleState());
@@ -96,6 +96,8 @@ public:
         }
     }
 
+    ~component_filter() { }
+
     //=============================================================================================
     // juce callbacks
 
@@ -134,6 +136,6 @@ public:
     }
 
 private:
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(component_filter_)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(component_filter)
 };
 

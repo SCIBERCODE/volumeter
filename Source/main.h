@@ -1,4 +1,6 @@
 
+// todo: обернуть в namespace volumeter
+
 enum waiting_event_t
 {
     device_init,
@@ -92,27 +94,27 @@ constexpr T _NAN = std::numeric_limits<T>::quiet_NaN(); // NAN
 
 //=================================================================================================
 const String prefix  (double value, const wchar_t *unit, size_t numder_of_decimals);
-const String prefix_v(double value);
 
 const bool is_about_equal(float a, float b);
 const bool round_flt     (float value);
 
-class main_component_;
+class main_component;
 
 //=================================================================================================
-class application_ : public JUCEApplication {
+class application : public JUCEApplication {
 //=================================================================================================
 private:
-    class main_window_ : public DocumentWindow
+    class main_window : public DocumentWindow
     {
     public:
-        main_window_(const String& name, application_& app);
+        main_window(const String& name, application& app);
+        ~main_window();
         void closeButtonPressed() override;
 
     private:
-        application_                   & _app;
-        std::unique_ptr<main_component_> _content;
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(main_window_)
+        application                   & _app;
+        std::unique_ptr<main_component> _content;
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(main_window)
     };
 
     struct option_names_t
@@ -150,9 +152,9 @@ private:
         { option_t::pass_low_order,     { L"pass_low_order",     L"120"   } },
     };
 
-    std::unique_ptr<main_window_>  _main_window;
-    std::unique_ptr<theme::light_> _theme;
-    ApplicationProperties          _settings;
+    std::unique_ptr<main_window>  _main_window;
+    std::unique_ptr<theme::light> _theme;
+    ApplicationProperties         _settings;
 
     const option_names_t* find_xml_name(const option_t request) const
     {
@@ -170,8 +172,8 @@ private:
     }
 //=================================================================================================
 public:
-    application_();
-    ~application_() override;
+    application();
+    ~application() override;
 
     const String getApplicationName() override;
     const String getApplicationVersion() override;
@@ -179,7 +181,7 @@ public:
     void  initialise(const String&) override;
     bool  moreThanOneInstanceAllowed() override;
 
-    theme::light_ *get_theme() const;
+    theme::light *get_theme() const;
 
     template <typename T>
     void save(const option_t option_name, T value) {
@@ -263,6 +265,6 @@ public:
         return String(corrected_value, 3) + L" dB"; // todo: выравнивать по точке
     }
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(application_)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(application)
 };
 

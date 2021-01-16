@@ -11,6 +11,8 @@
       <FILE id="N2JfGA" name="iir_coeff.cpp" compile="1" resource="0" file="Libs/spuce/filters/iir_coeff.cpp"/>
     </GROUP>
     <GROUP id="{4D1FF0D6-F97F-78FF-33FC-9D81D7CAB011}" name="source">
+      <FILE id="rSea9Y" name="circular_buffer.h" compile="0" resource="0"
+            file="Source/circular_buffer.h"/>
       <FILE id="FYAWgD" name="gui.h" compile="0" resource="0" file="Source/gui.h"/>
       <FILE id="qEaw0o" name="gui_calibration.h" compile="0" resource="0"
             file="Source/gui_calibration.h"/>
