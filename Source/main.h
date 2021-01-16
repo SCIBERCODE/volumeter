@@ -246,8 +246,10 @@ public:
 
         get_current_coef(channel, _coeff, _zero);
 
-        if (isfinite(_coeff))
-            result = raw_value * _coeff;
+        if (isfinite(_coeff)) {
+            if (raw_value)
+                result = raw_value * _coeff;
+        }
         else {
             result = gain2db(raw_value);
             if (isfinite(_zero))

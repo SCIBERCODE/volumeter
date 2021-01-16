@@ -11,22 +11,25 @@ private:
     struct iterator_t
     {
         size_t    size;
-        size_t    pointer;
+        uint32_t  pointer;
         channel_t channel;
     };
 
-    std::unique_ptr<value_t[]> _buffers[CHANNEL_SIZE];
-    size_t                     _tails  [CHANNEL_SIZE];
-    const size_t               _max_size;
-    iterator_t                 _it;
-    uint64_t                   _index { };
-    bool                       _full  { }; // как минимум единажды буфер был заполнен
+    std::map<size_t, iterator_t> _sessions; // хэндлы перечисления значений get_first_value/get_next_value
+    size_t                       _sessions_count { };
+    std::unique_ptr<value_t[]>   _buffer[CHANNEL_SIZE];
+    int32_t                      _head  [CHANNEL_SIZE];
+    const size_t                 _max_size;
+    uint64_t                     _values_count { };
+    bool                         _full { }; // как минимум единажды буфер был заполнен
 //=================================================================================================
 public:
+    static const uint32_t INVALID_HANDLE = static_cast<uint32_t>(-1);
+
     circular_buffer(const size_t max_size) :
         _max_size(max_size)
     {
-        for (auto& buffer : _buffers)
+        for (auto& buffer : _buffer)
             buffer = std::make_unique<value_t[]>(_max_size);
 
         clear();
@@ -36,39 +39,28 @@ public:
 
     void clear()
     {
-        for (auto line = LEFT; line < CHANNEL_SIZE; line++) {
-            if (_buffers[line])
-                for (size_t k = 0; k < _max_size; k++)
-                {
-                    _buffers[line][k].value_raw = _NAN<double>;
-                    _buffers[line][k].index     = 0;
-                }
+        for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++) {
+            _head[channel] = -1;
 
-            _tails[line] = 0;
+            if (_buffer[channel])
+                for (size_t k = 0; k < _max_size; k++)
+                    _buffer[channel][k] = { _NAN<double> };
         }
     }
 
     void enqueue(const channel_t channel, const double value)
     {
-        if (_max_size && isfinite(value) && _buffers[channel])
+        if (_max_size && isfinite(value) && _buffer[channel])
         {
-            auto& new_value  = _buffers[channel][_tails[channel]];
-            _tails[channel] = (_tails[channel] + 1) % _max_size;
+            _head[channel] = (_head[channel] + 1) % _max_size;
 
-            if (_tails[channel] == 0)
+            if (static_cast<size_t>(_head[channel]) == _max_size - 1)
                 _full = true;
 
+            auto& new_value     = _buffer[channel][_head[channel]];
+            new_value.index     = _values_count++;
             new_value.value_raw = value;
-            new_value.index     = _index++;
         }
-    }
-
-    auto is_full () const {
-        return _full;
-    }
-
-    auto get_tail(const channel_t channel) const {
-        return _buffers[channel][_tails[channel]].value_raw;
     }
 
     bool get_rms(std::array<double, VOLUME_SIZE>& rms) const
@@ -79,7 +71,7 @@ public:
         for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
             for (size_t k = 0; k < _max_size; ++k)
             {
-                auto value = _buffers[channel][k];
+                auto value = _buffer[channel][k];
                 if (isfinite(value.value_raw)) {
                     sum [channel] += value.value_raw;
                     size[channel]++;
@@ -96,45 +88,67 @@ public:
             return false;
     }
 
-    /** начало цикла извлечения значений буфера, в дальнейшем вызывается circular_buffer::get_next_value
-        @param index уникальный идентификатор значения в буфере
+    /** начало цикла извлечения значений буфера, в дальнейшем вызывается get_next_value
+        @return хэндл для дальнейшего использования в get_next_value
     */
-    bool get_first_value(const channel_t channel, const size_t size, double& value) { // todo: объединить функции в одну
-        if (size == 0 || size > _max_size || /* bug: исправить логику */ _tails[channel] == 0)
+    uint32_t get_first_value(const channel_t channel, const size_t size, double& value) { // todo: объединить функции в одну
+        if (size == 0 || size > _max_size || _head[channel] == -1)
             return false;
 
-        _it.pointer = _tails[channel] - 1;
-        _it.size    = size;
-        _it.channel = channel;
-        return get_next_value(value);
+        iterator_t new_it;
+
+        auto handle       = _sessions_count++;
+        new_it.pointer    = _head[channel];
+        new_it.size       = size;
+        new_it.channel    = channel;
+        _sessions[handle] = new_it;
+
+        if (get_next_value(handle, value))
+            return handle;
+
+        return INVALID_HANDLE;
     }
 
     /** извлечение значений буфера
         @return о завершении сообщается возвратом false
     */
-    bool get_next_value(double& value) {
-        value = _NAN<double>;
-        if (_it.pointer >= 0 && _it.size)
+    bool get_next_value(const uint32_t handle, double& value) {
+        auto result = _NAN<double>;
+
+        if (_sessions.count(handle) == 0)
+            return false;
+
+        auto& it = _sessions.at(handle);
+        if (it.size)
         {
-            value = _buffers[_it.channel][_it.pointer].value_raw;
-            if (_it.pointer == 0)
-                _it.pointer = _max_size - 1;
-            else
-                _it.pointer--;
+            result = _buffer[it.channel][it.pointer].value_raw;
+            it.pointer = it.pointer == 0 ?
+                _max_size  - 1 :
+                it.pointer - 1;
 
-            _it.size--;
+            it.size--;
         };
-        if (!isfinite(value))
-            _it = { };
-
-        return isfinite(value);
+        if (!isfinite(result))
+        {
+            it = { };
+            _sessions.erase(handle);
+        }
+        if (isfinite(result))
+        {
+            value = result;
+            return true;
+        }
+        return false;
     }
 
     auto get_extremes(const channel_t channel, const size_t window_size) {
-        auto   result = std::make_unique<double[]>(EXTREMES_SIZE);
-        double value;
+        auto     result = std::make_unique<double[]>(EXTREMES_SIZE);
+        double   value;
+        uint32_t handle;
 
-        if (get_first_value(channel, window_size, value)) {
+        handle = get_first_value(channel, window_size, value);
+        if (handle != INVALID_HANDLE)
+        {
             result[MIN] = value;
             result[MAX] = value;
             do {
@@ -142,9 +156,9 @@ public:
                 result[MIN] = std::min(value, result[MIN]);
                 result[MAX] = std::max(value, result[MAX]);
             }
-            while (get_next_value(value));
+            while (get_next_value(handle, value));
         }
-       return result;
+        return result;
     }
 
 private:

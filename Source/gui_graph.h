@@ -120,14 +120,16 @@ public:
     */
     void draw_graph_line(const channel_t channel, Graphics& g) {
         //=========================================================================================
-        auto   offset = 0.0f;
-        double value;
-        Path   path;
+        auto     offset = 0.0f;
+        double   value;
+        Path     path;
+        uint32_t buff_handle;
 
         if (_plot_indented.isEmpty())
             return;
 
-        if (!_graph_data->get_first_value(channel, _plot.getWidth(), value)) // bug: устранить мерцание в момент закольцовывания буфера
+        buff_handle = _graph_data->get_first_value(channel, _plot.getWidth(), value); // bug: устранить мерцание в момент закольцовывания буфера
+        if (buff_handle == circular_buffer::INVALID_HANDLE)
             return;
 
         for ( ; ; offset++)
@@ -140,37 +142,29 @@ public:
 
             path.lineTo(x, y);
 
-            if (!_graph_data->get_next_value(value))
+            if (!_graph_data->get_next_value(buff_handle, value))
                 break;
         }
-        if (path.getLength() == 0.0f || offset == 0.0f) // bug: как минимум единажды этой проверки оказалось недостаточно
+        auto length = path.getLength();
+        if (!isfinite(length) || path.getLength() == 0.0f || offset == 0.0f)
             return;
 
         const auto subpixel_correction = 0.2f;
 
-        // bug: масштабирование на гомогенных данных роняет алгоритм
-        path.scaleToFit(
+        auto transform = path.getTransformToScaleToFit (
             _plot_indented.getWidth()  - offset,
             _plot_indented.getY()      - subpixel_correction,
             offset,
             _plot_indented.getHeight() + subpixel_correction * 2,
-            false
+            false,
+            Justification::right
         );
+        if (!isfinite(transform.mat00) || !isfinite(transform.mat01) || !isfinite(transform.mat02) ||
+            !isfinite(transform.mat10) || !isfinite(transform.mat11) || !isfinite(transform.mat12))
+            return;
+
+        path.applyTransform(transform);
         g.setColour(channel == LEFT ? Colours::black : Colours::green);
-
-        /*PathFlatteningIterator it(path);
-        while (it.next());
-        PathFlatteningIterator it2(path);
-
-        size_t count = 0;
-        while (it2.next()) {
-            if (count > it.subPathIndex - 10) break;
-            Point<float> a(it2.x1, it2.y1); Point<float> b(it2.x2, it2.y2);
-            Line<float> line(a, b);
-            g.drawLine(line);
-            count++;
-        }*/
-
         g.strokePath(path, PathStrokeType(1.0f + subpixel_correction));
     }
 
@@ -180,14 +174,16 @@ public:
     */
     void draw_extremes(const channel_t channel, Graphics& g) {
         //=========================================================================================
-        double value;
-        String text[2];
-        auto   width    = _plot.getWidth();
-        auto   extremes = _graph_data->get_extremes(channel, width);
+        double   value;
+        String   text[2];
+        auto     width    = _plot.getWidth();
+        auto     extremes = _graph_data->get_extremes(channel, width);
+        uint32_t buff_handle;
 
         for (auto extremum = MIN; extremum < EXTREMES_SIZE; extremum++)
         {
-            if (!_graph_data->get_first_value(channel, width, value))
+            buff_handle = _graph_data->get_first_value(channel, width, value);
+            if (buff_handle == circular_buffer::INVALID_HANDLE)
                 continue;
 
             for (size_t offset = 0; ; offset++) // todo: ! оптимизация, хранить смещение и возвращать с get_extremes, вместо попиксельного поиска
@@ -198,6 +194,9 @@ public:
                 // todo: ! избавиться от индусского кода
                 text[0] = _app.print(_app.do_corrections(channel, value));
                 text[1] = _app.print(_app.do_corrections(channel, extremes[extremum]));
+
+                if (!isfinite(_app.do_corrections(channel, value)))
+                    break;
 
                 if (text[0] == text[1])
                 {
@@ -230,11 +229,9 @@ public:
 
                     break; // todo: несколько ключевых частот, в зависимости от свободного места (наи-большая/меньшая выделяется шрифтом или фоном)
                 }
-                if (!_graph_data->get_next_value(value))
+                if (!_graph_data->get_next_value(buff_handle, value))
                     break;
 
-                if (!isfinite(value))
-                    break;
             }
         }
     }
@@ -244,7 +241,7 @@ public:
     */
     void draw_legend(Graphics& g) {
         //=========================================================================================
-        const size_t line_width = 25;
+        const size_t line_width { 25 };
         Rectangle<int> rect
         (
             _plot_indented.getX() + 4,
