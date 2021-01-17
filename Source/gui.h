@@ -92,10 +92,10 @@ public:
                     {
                         auto       checkbox     = std::make_shared<ToggleButton>();
                         auto&      props        = checkbox->getProperties();
-                        const auto channel_name = __channel_name.at(line).toLowerCase();
+                        const auto channel_name = __channels_name.at(line).toLowerCase();
                         const auto option_name = line == LEFT ? option_t::graph_left : option_t::graph_right;
 
-                        checkbox->setButtonText(__channel_name.at(line));
+                        checkbox->setButtonText(__channels_name.at(line));
                         checkbox->setLookAndFeel(&_theme_left_tick);
                         checkbox->setTooltip(L"Show the " + channel_name + L" channel on the graph");
 
@@ -169,13 +169,13 @@ public:
             auto value = button_zero.getToggleState();
             _app.save(option_t::zero, value);
             if (value)
-                _signal.zero_set();
+                _signal.zeros_set();
             else
-                _signal.zero_clear();
+                _signal.zeros_clear();
         };
         if (_app.get_int(option_t::zero)) {
             button_zero.setToggleState(true, dontSendNotification);
-            _signal.zero_set(
+            _signal.zeros_set(
                 _app.get_text(option_t::zero_value_left ).getDoubleValue(),
                 _app.get_text(option_t::zero_value_right).getDoubleValue()
             );

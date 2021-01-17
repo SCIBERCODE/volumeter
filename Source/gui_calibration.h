@@ -15,8 +15,8 @@ private:
     struct cal_t
     {
         String name;
-        double channel[CHANNEL_SIZE];
-        double coeff  [CHANNEL_SIZE];
+        double channels[CHANNEL_SIZE];
+        double coeffs  [CHANNEL_SIZE];
     };
 
     const std::vector<column_t> _columns
@@ -158,7 +158,7 @@ public:
     };
 
     double get_coeff(const channel_t channel) {
-        return _selected == -1 ? 1.0 : _rows.at(_selected).coeff[channel];
+        return _selected == -1 ? 1.0 : _rows.at(_selected).coeffs[channel];
     }
 
     void delete_row(const int del_row)
@@ -188,10 +188,10 @@ public:
         {
             auto* e = cals->createNewChildElement(StringRef(L"ROW"));
             e->setAttribute(Identifier(L"name"),        row.name);
-            e->setAttribute(Identifier(L"left"),        row.channel[LEFT ]);
-            e->setAttribute(Identifier(L"left_coeff"),  row.coeff  [LEFT ]);
-            e->setAttribute(Identifier(L"right"),       row.channel[RIGHT]);
-            e->setAttribute(Identifier(L"right_coeff"), row.coeff  [RIGHT]);
+            e->setAttribute(Identifier(L"left"),        row.channels[LEFT ]);
+            e->setAttribute(Identifier(L"left_coeff"),  row.coeffs  [LEFT ]);
+            e->setAttribute(Identifier(L"right"),       row.channels[RIGHT]);
+            e->setAttribute(Identifier(L"right_coeff"), row.coeffs  [RIGHT]);
         }
         _app.save(option_t::calibrations, cals.get());
     }
@@ -240,8 +240,8 @@ public:
 
         switch (data_selector) {
         case cell_data_t::name:  text = _rows.at(row).name;                            break;
-        case cell_data_t::left:  text = prefix(_rows.at(row).channel[LEFT],  L"V", 0); break;
-        case cell_data_t::right: text = prefix(_rows.at(row).channel[RIGHT], L"V", 0); break;
+        case cell_data_t::left:  text = prefix(_rows.at(row).channels[LEFT],  L"V", 0); break;
+        case cell_data_t::right: text = prefix(_rows.at(row).channels[RIGHT], L"V", 0); break;
         }
 
         auto text_color = getLookAndFeel().findColour(ListBox::textColourId);

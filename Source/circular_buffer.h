@@ -17,8 +17,8 @@ private:
 
     std::map<size_t, iterator_t> _sessions; // хэндлы перечисления значений get_first_value/get_next_value
     size_t                       _sessions_count { };
-    std::unique_ptr<value_t[]>   _buffer[CHANNEL_SIZE];
-    int32_t                      _head  [CHANNEL_SIZE];
+    std::unique_ptr<value_t[]>   _buffers[CHANNEL_SIZE];
+    int32_t                      _heads  [CHANNEL_SIZE];
     const size_t                 _max_size;
     uint64_t                     _values_count { };
     bool                         _full { }; // как минимум единажды буфер был заполнен
@@ -29,7 +29,7 @@ public:
     circular_buffer(const size_t max_size) :
         _max_size(max_size)
     {
-        for (auto& buffer : _buffer)
+        for (auto& buffer : _buffers)
             buffer = std::make_unique<value_t[]>(_max_size);
 
         clear();
@@ -40,24 +40,24 @@ public:
     void clear()
     {
         for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++) {
-            _head[channel] = -1;
+            _heads[channel] = -1;
 
-            if (_buffer[channel])
+            if (_buffers[channel])
                 for (size_t k = 0; k < _max_size; k++)
-                    _buffer[channel][k] = { _NAN<double> };
+                    _buffers[channel][k] = { _NAN<double> };
         }
     }
 
     void enqueue(const channel_t channel, const double value)
     {
-        if (_max_size && isfinite(value) && _buffer[channel])
+        if (_max_size && isfinite(value) && _buffers[channel])
         {
-            _head[channel] = (_head[channel] + 1) % _max_size;
+            _heads[channel] = (_heads[channel] + 1) % _max_size;
 
-            if (static_cast<size_t>(_head[channel]) == _max_size - 1)
+            if (static_cast<size_t>(_heads[channel]) == _max_size - 1)
                 _full = true;
 
-            auto& new_value     = _buffer[channel][_head[channel]];
+            auto& new_value     = _buffers[channel][_heads[channel]];
             new_value.index     = _values_count++;
             new_value.value_raw = value;
         }
@@ -71,7 +71,7 @@ public:
         for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
             for (size_t k = 0; k < _max_size; ++k)
             {
-                auto value = _buffer[channel][k];
+                auto value = _buffers[channel][k];
                 if (isfinite(value.value_raw)) {
                     sum [channel] += value.value_raw;
                     size[channel]++;
@@ -92,13 +92,13 @@ public:
         @return хэндл для дальнейшего использования в get_next_value
     */
     uint32_t get_first_value(const channel_t channel, const size_t size, double& value) { // todo: объединить функции в одну
-        if (size == 0 || size > _max_size || _head[channel] == -1)
+        if (size == 0 || size > _max_size || _heads[channel] == -1)
             return false;
 
         iterator_t new_it;
 
         auto handle       = _sessions_count++;
-        new_it.pointer    = _head[channel];
+        new_it.pointer    = _heads[channel];
         new_it.size       = size;
         new_it.channel    = channel;
         _sessions[handle] = new_it;
@@ -121,24 +121,22 @@ public:
         auto& it = _sessions.at(handle);
         if (it.size)
         {
-            result = _buffer[it.channel][it.pointer].value_raw;
+            result = _buffers[it.channel][it.pointer].value_raw;
             it.pointer = it.pointer == 0 ?
                 _max_size  - 1 :
                 it.pointer - 1;
 
             it.size--;
         };
-        if (!isfinite(result))
-        {
-            it = { };
-            _sessions.erase(handle);
-        }
         if (isfinite(result))
         {
             value = result;
             return true;
         }
-        return false;
+        else {
+            _sessions.erase(handle);
+            return false;
+        }
     }
 
     auto get_extremes(const channel_t channel, const size_t window_size) {

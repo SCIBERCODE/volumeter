@@ -85,13 +85,5 @@ const String prefix(const double value, const wchar_t *unit, const size_t numder
     return String(new_value, static_cast<int>(numder_of_decimals)) + L" " + symbol + String(unit);
 }
 
-const bool is_about_equal(const float a, const float b) {
-    return fabs(a - b) <= ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * FLT_EPSILON);
-}
-
-const bool round_flt(const float value) {
-    return round(value * 10000.0f) / 10000.0f;
-}
-
 START_JUCE_APPLICATION(application)
 

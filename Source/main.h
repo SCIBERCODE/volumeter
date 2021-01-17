@@ -29,7 +29,7 @@ enum volume_t : size_t {
     VOLUME_SIZE
 };
 
-const std::map<size_t, String> __channel_name {
+const std::map<size_t, String> __channels_name {
     { LEFT,  L"Left"  },
     { RIGHT, L"Right" }
 };
@@ -92,11 +92,7 @@ void operator --(channel_t& value, int)
 template <class T>
 constexpr T _NAN = std::numeric_limits<T>::quiet_NaN(); // NAN
 
-//=================================================================================================
 const String prefix  (double value, const wchar_t *unit, size_t numder_of_decimals);
-
-const bool is_about_equal(float a, float b);
-const bool round_flt     (float value);
 
 class main_component;
 
@@ -241,19 +237,31 @@ public:
                 zero = get_text(option_t::zero_value_right).getDoubleValue();
     }
 
-    const auto do_corrections(channel_t channel, const double raw_value) { // bug: регулярно, но не всегда есть характерный v-образный провал в первой экране графика
+    static double db2gain(double decibels) {
+        return std::pow(10.0, decibels * 0.05);
+    }
+
+    // bug: регулярно, но не всегда есть характерный v-образный провал в первой экране графика, закономерность не замечена
+    //      нажатие-отжатие нуля влияет на график, что невозможно
+    const auto do_corrections(channel_t channel, const double raw_value) {
         auto result = _NAN<double>;
+        if (isfinite(raw_value)) {
 
-        get_current_coef(channel, _coeff, _zero);
+            result = raw_value;
+            get_current_coef(channel, _coeff, _zero);
 
-        if (isfinite(_coeff)) {
-            if (raw_value)
-                result = raw_value * _coeff;
-        }
-        else {
-            result = gain2db(raw_value);
-            if (isfinite(_zero))
-                result -= _zero;
+            if (isfinite(_coeff)) {
+                if (result) {
+                    if (isfinite(_zero))
+                        result = db2gain(gain2db(result) - gain2db(_zero));
+
+                    result *= _coeff;
+                }
+            }
+            else {
+                result = gain2db(result);
+                if (isfinite(_zero)) result -= gain2db(_zero);
+            }
         }
         return result;
     }

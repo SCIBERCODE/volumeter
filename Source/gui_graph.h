@@ -151,6 +151,7 @@ public:
 
         const auto subpixel_correction = 0.2f;
 
+        // todo: искусственно сжимать график при минимальной разнице уровней экстремумов
         auto transform = path.getTransformToScaleToFit (
             _plot_indented.getWidth()  - offset,
             _plot_indented.getY()      - subpixel_correction,
@@ -175,7 +176,6 @@ public:
     void draw_extremes(const channel_t channel, Graphics& g) {
         //=========================================================================================
         double   value;
-        String   text[2];
         auto     width    = _plot.getWidth();
         auto     extremes = _graph_data->get_extremes(channel, width);
         uint32_t buff_handle;
@@ -186,21 +186,16 @@ public:
             if (buff_handle == circular_buffer::INVALID_HANDLE)
                 continue;
 
-            for (size_t offset = 0; ; offset++) // todo: ! оптимизация, хранить смещение и возвращать с get_extremes, вместо попиксельного поиска
+            for (size_t offset = 0; ; offset++) // todo: оптимизировать, хранить смещение и возвращать с get_extremes, вместо попиксельного поиска
             {
-                //if (round_flt(value) == round_flt(_extremes[extremum]))
-                //if (is_about_equal(value, _extremes[extremum]))
-
-                // todo: ! избавиться от индусского кода
-                text[0] = _app.print(_app.do_corrections(channel, value));
-                text[1] = _app.print(_app.do_corrections(channel, extremes[extremum]));
-
-                if (!isfinite(_app.do_corrections(channel, value)))
-                    break;
-
-                if (text[0] == text[1])
+                if (value == extremes[extremum])
                 {
-                    const auto text_width = g.getCurrentFont().getStringWidth(text[0]);
+                    auto value_corrected = _app.do_corrections(channel, value);
+                    if (!isfinite(value_corrected)) break;
+
+                    auto text = _app.print(value_corrected);
+
+                    const auto text_width = g.getCurrentFont().getStringWidth(text);
                     Rectangle<int> rect
                     (
                         _plot.getRight() - offset - (text_width / 2),
@@ -217,12 +212,12 @@ public:
 
                     // правый график превалирует над левым, экстремумы левого не отображаются вовсе в случае
                     // даже частичного перекрытия значениями правого
-                    if (channel == RIGHT || (channel == LEFT && !_placed_extremes.intersectsRectangle(rect)))
+                    if (channel == RIGHT || (channel == LEFT && !_placed_extremes.intersectsRectangle(rect))) // todo: отображать вместе через слэш
                     {
                         g.setColour(Colours::white);
                         g.fillRect(rect);
                         g.setColour(channel == LEFT ? Colours::black : Colours::green);
-                        g.drawText(text[0], rect, Justification::centred, false);
+                        g.drawText(text, rect, Justification::centred, false);
                     }
                     if (channel == RIGHT)
                         _placed_extremes.add(rect);
@@ -251,7 +246,7 @@ public:
         );
         for (auto channel = LEFT; channel <= RIGHT; channel++)
         {
-            const auto text = __channel_name.at(channel);
+            const auto text = __channels_name.at(channel);
             const auto text_width = g.getCurrentFont().getStringWidth(text);
             g.setColour(channel == LEFT ? Colours::black : Colours::green);
             g.drawFittedText(text, rect.removeFromLeft(text_width + theme::margin), Justification::centredLeft, 1);

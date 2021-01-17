@@ -9,7 +9,7 @@ private:
         _angles[CHANNEL_SIZE] { };
 
 public:
-    sine () { }
+     sine() { }
     ~sine() { }
 
     void set_sample_rate(const double sample_rate) {
@@ -62,15 +62,15 @@ public:
         _orders[HIGH_PASS] = _app.get_int(option_t::pass_high_order);
         _orders[LOW_PASS ] = _app.get_int(option_t::pass_low_order );
 
-        zero_clear();
+        zeros_clear();
     }
 
     ~signal() { }
 
-    void zero_set(
+    void zeros_set(
         double value_left  = _NAN<double>,
-        double value_right = _NAN<double>)
-    {
+        double value_right = _NAN<double>
+    ) {
         std::lock_guard<std::mutex> locker(_locker);
         if (isfinite(value_left) && isfinite(value_right)) {
             _zeros[LEFT ] = value_left;
@@ -80,8 +80,8 @@ public:
             std::array<double, VOLUME_SIZE> rms;
             if (_buff->get_rms(rms))
             {
-                _zeros[LEFT ] = gain2db(rms[LEFT ]);
-                _zeros[RIGHT] = gain2db(rms[RIGHT]);
+                _zeros[LEFT ] = rms[LEFT ];
+                _zeros[RIGHT] = rms[RIGHT];
                 _app.save(option_t::zero_value_left,  _zeros[LEFT ]);
                 _app.save(option_t::zero_value_right, _zeros[RIGHT]);
             }
@@ -89,11 +89,11 @@ public:
         extremes_clear();
     }
 
-    auto zero_get(const channel_t channel) const {
+    auto zeros_get(const channel_t channel) const {
         return _zeros[channel];
     }
 
-    void zero_clear() {
+    void zeros_clear() {
         for (auto& zero : _zeros) zero = 0.0;
         extremes_clear();
     }
