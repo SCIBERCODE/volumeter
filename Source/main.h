@@ -78,6 +78,38 @@ enum class option_t {
     pass_low_order,
 };
 
+namespace options_t {
+    enum : size_t {
+        buff_size,
+
+        tone_activated,
+        tone_value,
+
+        zero_activated,
+        zero_channels,
+
+        graph_paused,
+        graph_channels
+    };
+    enum device : size_t {
+        type,
+        name,
+        sample_rate
+    };
+    enum calibration : size_t {
+        activated,
+        prefix,
+        list,
+        index
+    };
+    enum filter : size_t {
+        activated_high,
+        activated_low,
+        freqs,
+        orders,
+    };
+}
+
 template <typename T>
 void operator ++(T& value, int) // todo: проверить на вызовы с другими типами помимо перечислений, описанных выше
 {
@@ -140,7 +172,7 @@ private:
         { option_t::calibrations,       { L"calibrations",       { }      } },
         { option_t::calibrations_index, { L"calibrations_index", L"-1"    } },
         // фильтры
-        { option_t::pass_high,          { L"pass_high",          L"0"     } }, // todo: объединить в файле конфигурации
+        { option_t::pass_high,          { L"pass_high",          L"0"     } },
         { option_t::pass_low,           { L"pass_low",           L"0"     } },
         { option_t::pass_high_freq,     { L"pass_high_freq",     { }      } },
         { option_t::pass_low_freq,      { L"pass_low_freq",      { }      } },
