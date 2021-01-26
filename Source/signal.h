@@ -46,12 +46,12 @@ private:
     std::mutex    _locker;
     sine          _sine;
     std::unique_ptr<circular_buffer>
-                  _buff;
+                  _buff    [GRAPH_TYPE_SIZE];
     std::unique_ptr<spuce::iir<spuce::float_type, spuce::float_type>>
-                  _filters [CHANNEL_SIZE][FILTER_TYPE_SIZE];
-    size_t        _orders                [FILTER_TYPE_SIZE];
-    double        _extremes[VOLUME_SIZE ][EXTREMES_SIZE   ];
-    double        _zeros   [CHANNEL_SIZE];
+                  _filters [CHANNEL_SIZE   ][FILTER_TYPE_SIZE];
+    size_t        _orders                   [FILTER_TYPE_SIZE];
+    double        _extremes[VOLUME_SIZE    ][EXTREMES_SIZE   ];
+    double        _zeros   [CHANNEL_SIZE   ];
     application & _app;
 //=================================================================================================
 public:
@@ -78,7 +78,7 @@ public:
         }
         else {
             std::array<double, VOLUME_SIZE> rms;
-            if (_buff->get_rms(rms))
+            if (_buff[INPUT]->get_rms(rms))
             {
                 _zeros[LEFT ] = rms[LEFT ];
                 _zeros[RIGHT] = rms[RIGHT];
@@ -132,23 +132,24 @@ public:
         std::lock_guard<std::mutex> locker(_locker);
         if (new_size && _sample_rate) {
             auto number_of_samples = static_cast<size_t>(new_size / (1000.0 / _sample_rate));
-            _buff = std::make_unique<circular_buffer>(number_of_samples);
+            _buff[INPUT ] = std::make_unique<circular_buffer>(number_of_samples);
+            _buff[OUTPUT] = std::make_unique<circular_buffer>(number_of_samples);
         }
     }
 
     void clear_data() {
         std::lock_guard<std::mutex> locker(_locker);
-        if (_buff)
-            _buff->clear();
+        if (_buff[INPUT ]) _buff[INPUT ]->clear();
+        if (_buff[OUTPUT]) _buff[OUTPUT]->clear();
     }
 
     void set_order(const filter_type_t filter_type, const int new_order) {
         _orders[filter_type] = new_order;
     }
 
-    std::vector<double> get_rms() const {
+    std::vector<double> get_rms(graph_type_t type) const {
         std::array<double, VOLUME_SIZE> result;
-        if (_buff && _buff->get_rms(result))
+        if (_buff[type] && _buff[type]->get_rms(result))
         {
             return { result[LEFT], result[RIGHT] };
         };
@@ -189,26 +190,30 @@ public:
 
     void next_audio_block(const AudioSourceChannelInfo& buffer)
     {
-        if (_locker.try_lock()) // todo: битый буфер не норм, сигнализировать, что не тянет проц текущих настроек
+        if (_locker.try_lock()) // T[19]
         {
-            if (_buff)
+            if (_buff[INPUT] && _buff[OUTPUT])
             {
                 auto read          = buffer.buffer->getArrayOfReadPointers();
                 auto write         = buffer.buffer->getArrayOfWritePointers();
                 auto use_high_pass = _app.get_int(option_t::pass_high) && _filters[LEFT][HIGH_PASS] && _filters[RIGHT][HIGH_PASS];
                 auto use_low_pass  = _app.get_int(option_t::pass_low ) && _filters[LEFT][LOW_PASS ] && _filters[RIGHT][LOW_PASS ];
-                auto use_tone      = _app.get_int(option_t::tone     ); // todo: ускорить работу в этой процедуре
+                auto use_tone      = _app.get_int(option_t::tone     ); // T[20]
 
                 for (auto channel = LEFT; channel <= RIGHT; channel++)
                     for (auto sample_index = 0; sample_index < buffer.numSamples; ++sample_index)
                     {
-                        _buff->enqueue(channel, read[channel][sample_index] * read[channel][sample_index]);
+                        _buff[INPUT]->enqueue(channel, read[channel][sample_index] * read[channel][sample_index]);
                         if (use_high_pass || use_low_pass || use_tone)
                         {
-                            spuce::float_type sample = use_tone ? _sine.sample(channel) : read[channel][sample_index];
+                            spuce::float_type  sample = use_tone ? _sine.sample(channel) : read[channel][sample_index];
                             if (use_high_pass) sample = _filters[channel][HIGH_PASS]->clock(sample);
-                            if (use_low_pass)  sample = _filters[channel][LOW_PASS ]->clock(sample);
+                            if (use_low_pass)  sample = _filters[channel][LOW_PASS] ->clock(sample);
                             write[channel][sample_index] = static_cast<float>(sample);
+                            _buff[OUTPUT]->enqueue(channel, sample * sample);
+                        }
+                        else {
+                            _buff[OUTPUT]->enqueue(channel, read[channel][sample_index] * read[channel][sample_index]);
                         }
                     }
 

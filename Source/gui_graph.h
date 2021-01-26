@@ -1,10 +1,6 @@
 
-// bug: провалы вверх при переключении фильтра
-//         ! и, соответственно, вниз при частично заполненном буфере, что происходит при переключении параметров
-
-// todo: регулировка масштаба с галкой автомасштрабирования
-//       скорость движения графика
-//       сглаживание
+// B[01][02]
+// T[21][22][23]
 
 class component_graph : public Component,
                         public Timer {
@@ -38,7 +34,7 @@ private:
 
     Rectangle<int>                   _plot;
     Rectangle<int>                   _plot_indented;
-    std::unique_ptr<circular_buffer> _graph_data; // bug: очищать при смене устройства
+    std::unique_ptr<circular_buffer> _graph_data[GRAPH_TYPE_SIZE]; // B[03]
     RectangleList<int>               _placed_extremes;
     waiting_t                        _wait;
     signal                         & _signal;
@@ -75,16 +71,17 @@ public:
         for (const auto& display : Desktop::getInstance().getDisplays().displays)
             display_width += display.userArea.getWidth();
 
-        _graph_data = std::make_unique<circular_buffer>(display_width);
+        _graph_data[INPUT ] = std::make_unique<circular_buffer>(display_width);
+        _graph_data[OUTPUT] = std::make_unique<circular_buffer>(display_width);
     }
 
-    void enqueue(const channel_t channel, const double value_raw) {
+    void enqueue(const graph_type_t type, const channel_t channel, const double value_raw) {
         if (_app.get_int(option_t::graph_paused) == 0) {
             if (isfinite(value_raw)) {
-                _graph_data->enqueue(channel, value_raw);
+                _graph_data[type]->enqueue(channel, value_raw);
 
                 if (channel == RIGHT)
-                    repaint(); // todo: оптимизировать
+                    repaint(); // T[24]
             }
         }
     }
@@ -114,11 +111,11 @@ public:
         return _wait.running;
     }
 
-    // todo: иконка взаимной зависимости каналов (единое масштабирование)
-    //       настройка сглаживания графика
+    // T[25][26]
+
     /** построение линии сигнала, масштабирование и отрисовка
     */
-    void draw_graph_line(const channel_t channel, Graphics& g) {
+    void draw_graph_line(const graph_type_t type, const channel_t channel, Graphics& g) {
         //=========================================================================================
         auto     offset = 0.0f;
         double   value;
@@ -128,7 +125,7 @@ public:
         if (_plot_indented.isEmpty())
             return;
 
-        buff_handle = _graph_data->get_first_value(channel, _plot.getWidth(), value); // bug: устранить мерцание в момент закольцовывания буфера
+        buff_handle = _graph_data[type]->get_first_value(channel, _plot.getWidth(), value); // B[04]
         if (buff_handle == circular_buffer::INVALID_HANDLE)
             return;
 
@@ -142,7 +139,7 @@ public:
 
             path.lineTo(x, y);
 
-            if (!_graph_data->get_next_value(buff_handle, value))
+            if (!_graph_data[type]->get_next_value(buff_handle, value))
                 break;
         }
         auto length = path.getLength();
@@ -151,7 +148,7 @@ public:
 
         const auto subpixel_correction = 0.2f;
 
-        // todo: искусственно сжимать график при минимальной разнице уровней экстремумов
+        // T[27]
         auto transform = path.getTransformToScaleToFit (
             _plot_indented.getWidth()  - offset,
             _plot_indented.getY()      - subpixel_correction,
@@ -169,24 +166,24 @@ public:
         g.strokePath(path, PathStrokeType(1.0f + subpixel_correction));
     }
 
-    // todo: подсветка точки треугольником на линии графика
-    //       точки лишь в позиции области, подвергшейся коррекции (можно настройкой)
+    // T[28][29]
+
     /** отрисовка экстремумов (правый канал перекрывает левый)
     */
-    void draw_extremes(const channel_t channel, Graphics& g) {
+    void draw_extremes(const graph_type_t type, const channel_t channel, Graphics& g) {
         //=========================================================================================
         double   value;
         auto     width    = _plot.getWidth();
-        auto     extremes = _graph_data->get_extremes(channel, width);
+        auto     extremes = _graph_data[type]->get_extremes(channel, width);
         uint32_t buff_handle;
 
         for (auto extremum = MIN; extremum < EXTREMES_SIZE; extremum++)
         {
-            buff_handle = _graph_data->get_first_value(channel, width, value);
+            buff_handle = _graph_data[type]->get_first_value(channel, width, value);
             if (buff_handle == circular_buffer::INVALID_HANDLE)
                 continue;
 
-            for (size_t offset = 0; ; offset++) // todo: оптимизировать, хранить смещение и возвращать с get_extremes, вместо попиксельного поиска
+            for (size_t offset = 0; ; offset++) // T[30]
             {
                 if (value == extremes[extremum])
                 {
@@ -212,7 +209,7 @@ public:
 
                     // правый график превалирует над левым, экстремумы левого не отображаются вовсе в случае
                     // даже частичного перекрытия значениями правого
-                    if (channel == RIGHT || (channel == LEFT && !_placed_extremes.intersectsRectangle(rect))) // todo: отображать вместе через слэш
+                    if (channel == RIGHT || (channel == LEFT && !_placed_extremes.intersectsRectangle(rect))) // T[31]
                     {
                         g.setColour(Colours::white);
                         g.fillRect(rect);
@@ -222,9 +219,9 @@ public:
                     if (channel == RIGHT)
                         _placed_extremes.add(rect);
 
-                    break; // todo: несколько ключевых частот, в зависимости от свободного места (наи-большая/меньшая выделяется шрифтом или фоном)
+                    break; // T[32]
                 }
-                if (!_graph_data->get_next_value(buff_handle, value))
+                if (!_graph_data[type]->get_next_value(buff_handle, value))
                     break;
 
             }
@@ -256,8 +253,8 @@ public:
         }
     }
 
-    // todo: график состава групп
-    //       также отображать изменение параметров, влиящих на вид графика
+    // T[33][34]
+
     /** рисование линий, заливок и прочей индикации
     */
     void draw_indications(Graphics& g) {
@@ -314,14 +311,16 @@ public:
 
         draw_indications(g);
 
+        auto type = static_cast<graph_type_t>(_app.get_int(option_t::graph_type));
+
         _placed_extremes.clear();
         for (auto channel = RIGHT; channel < CHANNEL_SIZE; channel--)
         {
             if (channel == LEFT  && _app.get_int(option_t::graph_left ) == 0) continue;
             if (channel == RIGHT && _app.get_int(option_t::graph_right) == 0) continue;
 
-            draw_graph_line(channel, g);
-            draw_extremes  (channel, g);
+            draw_graph_line(type, channel, g);
+            draw_extremes  (type, channel, g);
         }
         g.setColour(Colours::grey);
         g.drawRect(_plot);
@@ -332,7 +331,7 @@ public:
     void timerCallback() override {
         //=========================================================================================
         _wait.stub_text->setText(get_timer_text(_wait.event), dontSendNotification);
-        if (_wait.remain_ms >= _wait.timer_value_ms) // bug: на бОльших частотах дискретизации
+        if (_wait.remain_ms >= _wait.timer_value_ms) // B[00]
         {
             _wait.remain_ms -= _wait.timer_value_ms;
             _wait.progress_value = jmap(

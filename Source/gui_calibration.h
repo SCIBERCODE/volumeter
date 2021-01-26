@@ -24,10 +24,10 @@ private:
         { cell_data_t::name,   L"Name",  300 },
         { cell_data_t::left,   L"Left",  100 },
         { cell_data_t::right,  L"Right", 100 },
-        { cell_data_t::button, L"",      30  } // todo: не растягивать при ресайзе
+        { cell_data_t::button, L"",      30  } // T[06]
     };
 
-    signal           & _signal; // todo: использовать умные указатели
+    signal           & _signal; // T[07]
     application      & _app;
     std::vector<cal_t> _rows;
     int                _selected { -1 };
@@ -53,7 +53,7 @@ public:
         checkbox_cal.onClick = [this]
         {
             _app.save(option_t::calibrate, checkbox_cal.getToggleState());
-            _signal.extremes_clear(); // todo: сохранять статистику, переводя в вольты
+            _signal.extremes_clear(); // T[08]
         };
 
         addAndMakeVisible(table_cals);
@@ -68,17 +68,17 @@ public:
 
         size_t id = 0;
         for (auto const& column : _columns)
-            table_cals.getHeader().addColumn(column.header, ++id, column.width, 30, -1, TableHeaderComponent::notSortable); // todo: реализовать сортировку
+            table_cals.getHeader().addColumn(column.header, ++id, column.width, 30, -1, TableHeaderComponent::notSortable); // T[09]
 
         addAndMakeVisible(label_cal_add);
-        addAndMakeVisible(editor_cal_name); // todo: национальные символы
+        addAndMakeVisible(editor_cal_name); // T[10]
         addAndMakeVisible(label_cal_channels);
         addAndMakeVisible(button_cal_add);
         addAndMakeVisible(combo_prefix);
 
         for (auto& editor : editor_cal_channels) {
             addAndMakeVisible(editor);
-            editor.setTextToShowWhenEmpty(L"0.0", Colours::grey); // todo: менять префикс в подсказке пустого поля в зависимости от выбора единицы измерения
+            editor.setTextToShowWhenEmpty(L"0.0", Colours::grey); // T[11]
             editor.setInputRestrictions(0, L"0123456789.");
 
             editor.onTextChange = [this] {
@@ -123,13 +123,13 @@ public:
                 cals = std::make_unique<XmlElement>(StringRef(L"ROWS"));
 
             auto* e  = cals->createNewChildElement(StringRef(L"ROW"));
-            auto rms = _signal.get_rms();
+            auto rms = _signal.get_rms(INPUT);
 
             e->setAttribute(Identifier(L"name"),        editor_cal_name.getText());
             e->setAttribute(Identifier(L"left"),        channels[LEFT ]);
             e->setAttribute(Identifier(L"left_coeff"),  channels[LEFT ] / rms.at(LEFT ));
             e->setAttribute(Identifier(L"right"),       channels[RIGHT]);
-            e->setAttribute(Identifier(L"right_coeff"), channels[RIGHT] / rms.at(RIGHT)); // todo: check for nan
+            e->setAttribute(Identifier(L"right_coeff"), channels[RIGHT] / rms.at(RIGHT)); // T[04]
 
             _app.save(option_t::calibrations, cals.get());
             update();
@@ -204,7 +204,7 @@ public:
         table_cals.deselectAllRows();
     }
 
-    void mouseDoubleClick(const MouseEvent &) { // bug: срабатывает на всём компоненте
+    void mouseDoubleClick(const MouseEvent &) { // B[08]
         //=========================================================================================
         auto current = table_cals.getSelectedRow();
         _selected = current == _selected ? -1 : current;
@@ -265,7 +265,7 @@ public:
         editor_cal_channels[LEFT].setBounds(line.removeFromLeft(edit_width - 5));
         line.removeFromLeft(theme::margin);
         editor_cal_channels[RIGHT].setBounds(line.removeFromLeft(edit_width - 5));
-        line.removeFromLeft(theme::margin); // bug: на этой границе положение меняется скачками
+        line.removeFromLeft(theme::margin); // B[09]
         line.removeFromRight(theme::margin);
         combo_prefix.setBounds(line);
 
@@ -279,7 +279,7 @@ public:
         _app.get_theme()->set_header_checkbox_bounds(checkbox_cal);
     }
 
-    // bug: ширина кнопок меняется скачками
+    // B[10]
     Component* refreshComponentForCell(int row, int column_id, bool /*is_selected*/, Component* component) override {
         //=========================================================================================
         if (_columns.at(column_id - 1).type == cell_data_t::button)
@@ -302,7 +302,7 @@ private:
         TextButton             _button;
         int                    _row;
     public:
-        table_custom_button(component_calibration& owner) : _owner(owner) // todo: при курсоре над кнопкой подсвечивать строку
+        table_custom_button(component_calibration& owner) : _owner(owner) // T[05]
         {
             addAndMakeVisible(_button);
             _button.setButtonText(L"X");

@@ -1,5 +1,5 @@
 
-// bug: самовозбуд стейнберга при выкрученной громкости на lpf 15000
+// B[07]
 
 class component_filter : public Component {
 //=================================================================================================
@@ -20,7 +20,7 @@ public:
 
     component_filter(application& app, signal& signal) :
         _signal(signal), _app(app)
-    // todo: component_filter(shared_ptr<signal> signal) : signal(move(signal))
+        // T[13]
     {
         addAndMakeVisible(group);
 
@@ -67,7 +67,7 @@ public:
                 return enabled;
             };
 
-            edit->onTextChange = [this, type, option_freq, check_input]
+            edit->onTextChange = [this, type, option_freq, check_input] // T[12]
             {
                 auto value = edits_freq[type]->getText();
                 if (check_input(checkboxes_type[type].get(), value) || value.isEmpty()) {

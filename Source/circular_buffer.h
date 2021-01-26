@@ -91,7 +91,7 @@ public:
     /** начало цикла извлечения значений буфера, в дальнейшем вызывается get_next_value
         @return хэндл для дальнейшего использования в get_next_value
     */
-    uint32_t get_first_value(const channel_t channel, const size_t size, double& value) { // todo: объединить функции в одну
+    uint32_t get_first_value(const channel_t channel, const size_t size, double& value) { // T[35]
         if (size == 0 || size > _max_size || _heads[channel] == -1)
             return false;
 

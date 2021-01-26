@@ -1,5 +1,5 @@
 
-// todo: выбор порядка точности
+// T[00]
 
 class main_component : public AudioAppComponent,
                        public Timer {
@@ -26,12 +26,14 @@ private:
     Label                      label_device_type { { }, L"Type"        },
                                label_device      { { }, L"Device"      },
                                label_sample_rate { { }, L"Sample rate" },
-                               label_buff_size   { { }, L"Buff size"   };
+                               label_buff_size   { { }, L"Buff size"   },
+                               label_graph_type  { { }, L"Graph for"   };
     ToggleButton               checkbox_tone     {      L"Tone"        };
     TooltipWindow              hint              { this, 500           };
     TextButton                 button_stat_reset, button_pause_graph, button_zero;
     ComboBox                   combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
-    controls_t                 stat_controls[VOLUME_SIZE][LABELS_STAT_COLUMN_SIZE];
+    controls_t                 stat_controls        [VOLUME_SIZE    ][LABELS_STAT_COLUMN_SIZE];
+    ToggleButton               checkboxes_graph_type[GRAPH_TYPE_SIZE];
 //=================================================================================================
 public:
     main_component(application& app) :
@@ -81,7 +83,7 @@ public:
         };
 
         /** =======================================================================================
-            статистика
+            statistics
         */
         for (size_t line = LEFT; line < VOLUME_SIZE; line++) {
             for (auto column = LABEL; column < LABELS_STAT_COLUMN_SIZE; column++)
@@ -121,7 +123,8 @@ public:
                     }
                 }
                 else // создание надписей с данными и экстремумами
-                { // todo: сработка соответствующих галочек при нажатии на цифры показометра
+                { 
+                    // T[01]
                     auto label = std::make_shared<Label>();
 
                     if (column == VALUE)
@@ -135,6 +138,29 @@ public:
                 }
         }
 
+        /** =======================================================================================
+            above the graph
+        */
+        addAndMakeVisible(label_graph_type);
+        label_graph_type.setJustificationType(Justification::right);
+        for (size_t type = INPUT; type < GRAPH_TYPE_SIZE; type++)
+        {
+            addAndMakeVisible(checkboxes_graph_type[type]);
+            checkboxes_graph_type[type].setRadioGroupId(1);
+            checkboxes_graph_type[type].onClick = [this, type] {
+                _app.save(option_t::graph_type, static_cast<int>(type));
+            };
+        }
+
+        checkboxes_graph_type[INPUT ].setButtonText(L"Input Buffer");
+        checkboxes_graph_type[OUTPUT].setButtonText(L"Output Buffer");
+
+        auto type_loaded = static_cast<graph_type_t>(_app.get_int(option_t::graph_type));
+        checkboxes_graph_type[type_loaded].setToggleState(true, dontSendNotification);
+
+        /** =======================================================================================
+            bellow the graph
+        */
         addAndMakeVisible(button_stat_reset);
         addAndMakeVisible(button_pause_graph);
         addAndMakeVisible(button_zero);
@@ -186,7 +212,7 @@ public:
         addAndMakeVisible(_component_calibration);
         _component_calibration.update();
 
-        setSize(430, 790);
+        setSize(430, 825);
         startTimer(100);
 
         setAudioChannels(2, 2);
@@ -213,7 +239,7 @@ public:
         label_sample_rate.attachToComponent(&combo_dev_rates,   true);
 
         const OwnedArray<AudioIODeviceType>& types = deviceManager.getAvailableDeviceTypes();
-        if (types.size() > 1) // bug: при смене типа и возврате назад, из настроек подтягивается, но не отображается выбранным
+        if (types.size() > 1) // B[11]
         {
             auto index = 0;
             for (auto i = 0; i < types.size(); ++i)
@@ -301,7 +327,7 @@ public:
         _signal.next_audio_block(buffer);
     }
 
-    void resized() override { // todo: широкое окно
+    void resized() override { // T[02]
         //=========================================================================================
         auto area = getLocalBounds().reduced(theme::margin * 2);
         auto combo_with_label = [&](ComboBox& combo)
@@ -311,9 +337,9 @@ public:
             combo.setBounds(line);
             area.removeFromTop(theme::margin);
         };
-        // последовательное размещение компонентов сверху вниз
+        // top to bottom
         {
-            // девайсы
+            // audio devices
             combo_with_label(combo_dev_types);
             combo_with_label(combo_dev_outputs);
             combo_with_label(combo_dev_rates);
@@ -329,15 +355,14 @@ public:
             combo_tone.setBounds(line);
             area.removeFromTop(theme::margin);
         }
-        // снизу вверх
+        Rectangle<int> remain;
         {
             area.removeFromBottom(theme::margin);
-            // фильтр
             _component_filter.setBounds(area.removeFromBottom(95));
             area.removeFromBottom(theme::margin);
             _component_calibration.setBounds(area.removeFromBottom(250));
 
-            // stat
+            // bellow the graph, bottom to top
             area.removeFromBottom(theme::margin * 2);
             auto line = area.removeFromBottom(theme::height);
             button_zero.setBounds(line.removeFromRight(theme::button_width));
@@ -346,9 +371,10 @@ public:
             line.removeFromRight(theme::margin);
             button_stat_reset.setBounds(line.removeFromRight(theme::button_width));
 
-            auto remain = area;
-            auto left   = area.removeFromLeft(theme::label_width);
-            auto right  = area.removeFromRight(getWidth() / 2);
+            // above the graph, top to bottom
+            remain = area;
+            auto left  = area.removeFromLeft(theme::label_width);
+            auto right = area.removeFromRight(getWidth() / 2);
             right.removeFromRight(theme::margin * 2);
 
             for (size_t line_index = LEFT; line_index < VOLUME_SIZE; line_index++)
@@ -359,7 +385,7 @@ public:
                 }
                 else {
                     if (auto label_balance = _get<Label>(stat_controls[line_index][LABEL]))
-                        label_balance->setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin - 3)); // todo: расположить в ряд без подгонки
+                        label_balance->setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin - 3)); // T[03]
                 }
 
                 if (auto label = _get<Label>(stat_controls[line_index][VALUE]))
@@ -370,35 +396,41 @@ public:
 
                 remain.removeFromTop(theme::height);
 
-                if (line_index < BALANCE) {
-                    area  .removeFromTop(theme::margin);
-                    right .removeFromTop(theme::margin);
-                    left  .removeFromTop(theme::margin);
-                    remain.removeFromTop(theme::margin);
-                }
-            }
-            remain.removeFromTop(theme::margin);
-            remain.removeFromBottom(theme::margin);
-            _component_graph.setBounds(remain);
+                auto top_margin = theme::margin;
+                if (line_index == BALANCE) top_margin *= 3; // for the graph_type
+                area.removeFromTop  (top_margin);
+                right.removeFromTop (top_margin);
+                left.removeFromTop  (top_margin);
+                remain.removeFromTop(top_margin);
+            }            
+            label_graph_type.setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin));
+            checkboxes_graph_type[INPUT ].setBounds(area.removeFromTop(theme::height));
+            checkboxes_graph_type[OUTPUT].setBounds(right.removeFromTop(theme::height));
+            remain.removeFromTop(theme::height);
         }
+        remain.removeFromTop(theme::margin);
+        remain.removeFromBottom(theme::margin);
+        _component_graph.setBounds(remain);
     }
 
     void timerCallback() override {
         //=========================================================================================
-        auto rms = _signal.get_rms();
-        if (rms.size() == 0) return;
+        std::vector<double> rms[GRAPH_TYPE_SIZE] = { _signal.get_rms(INPUT), _signal.get_rms(OUTPUT) };
+        if (rms[INPUT].size() == 0 || rms[OUTPUT].size() == 0) return;
 
         if (_component_graph.is_waiting())
             _component_graph.stop_waiting();
 
-        for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
-        {
-            _component_graph.enqueue(channel, rms.at(channel));
-            rms.at(channel) = _app.do_corrections(channel, rms.at(channel));
-        }
+        for (auto type = INPUT; type < GRAPH_TYPE_SIZE; type ++)
+            for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
+            {
+                _component_graph.enqueue(type, channel, rms[type].at(channel));
+                if (type == INPUT)
+                    rms[type].at(channel) = _app.do_corrections(channel, rms[type].at(channel));
+            }
 
-        rms.push_back(abs(rms.at(LEFT) - rms.at(RIGHT))); // баланс вычисляется после всех корректировок
-        _signal.extremes_set(rms);
+        rms[INPUT].push_back(abs(rms[INPUT].at(LEFT) - rms[INPUT].at(RIGHT))); // баланс вычисляется после всех корректировок
+        _signal.extremes_set(rms[INPUT]);
 
         String printed[3];
         for (size_t line = LEFT; line < VOLUME_SIZE; line++)
@@ -406,13 +438,13 @@ public:
             std::fill_n(printed, _countof(printed), theme::empty);
             auto extremes = _signal.extremes_get(line);
 
-            if (isfinite(rms.at(line)))  printed[0] = _app.print(rms.at(line));
-            if (isfinite(extremes[MIN])) printed[1] = _app.print(extremes[MIN]);
-            if (isfinite(extremes[MAX])) printed[2] = _app.print(extremes[MAX]);
+            if (isfinite(rms[INPUT].at(line))) printed[0] = _app.print(rms[INPUT].at(line));
+            if (isfinite(extremes[MIN]))       printed[1] = _app.print(extremes[MIN]);
+            if (isfinite(extremes[MAX]))       printed[2] = _app.print(extremes[MAX]);
 
             if (auto label = _get<Label>(stat_controls[line][VALUE])) {
                 label->setText(printed[0], dontSendNotification);
-                label->setColour(Label::textColourId, isfinite(rms.at(line)) ? Colours::black : Colours::grey);
+                label->setColour(Label::textColourId, isfinite(rms[INPUT].at(line)) ? Colours::black : Colours::grey);
             }
             if (auto label = _get<Label>(stat_controls[line][EXTREMES]))
                 label->setText(printed[1] + L" .. " + printed[2], dontSendNotification);
