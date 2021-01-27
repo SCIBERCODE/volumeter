@@ -15,13 +15,13 @@ private:
         channel_t channel;
     };
 
-    std::map<size_t, iterator_t> _sessions; // хэндлы перечисления значений get_first_value/get_next_value
+    std::map<size_t, iterator_t> _sessions;           // value enumeration handles used in get_first_value/get_next_value
     size_t                       _sessions_count { };
+    uint64_t                     _values_count   { };
+    bool                         _full           { }; // the buffer has been filled at least once
     std::unique_ptr<value_t[]>   _buffers[CHANNEL_SIZE];
     int32_t                      _heads  [CHANNEL_SIZE];
     const size_t                 _max_size;
-    uint64_t                     _values_count { };
-    bool                         _full { }; // как минимум единажды буфер был заполнен
 //=================================================================================================
 public:
     static const uint32_t INVALID_HANDLE = static_cast<uint32_t>(-1);
@@ -88,8 +88,9 @@ public:
             return false;
     }
 
-    /** начало цикла извлечения значений буфера, в дальнейшем вызывается get_next_value
-        @return хэндл для дальнейшего использования в get_next_value
+    /** retrieving values in reverse order
+        @param size the maximum number of values to be read
+        @return values enumeration handle used in a subsequent call to get_next_value
     */
     uint32_t get_first_value(const channel_t channel, const size_t size, double& value) { // T[35]
         if (size == 0 || size > _max_size || _heads[channel] == -1)
@@ -109,8 +110,8 @@ public:
         return INVALID_HANDLE;
     }
 
-    /** извлечение значений буфера
-        @return о завершении сообщается возвратом false
+    /** continues a value retrieving from a previous call to the get_first_value
+        @return the function fails when there is no more data left to retrieve
     */
     bool get_next_value(const uint32_t handle, double& value) {
         auto result = _NAN<double>;

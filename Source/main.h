@@ -1,4 +1,3 @@
-
 // T[17]
 
 enum waiting_event_t
@@ -47,8 +46,8 @@ enum filter_type_t : size_t {
 };
 
 enum graph_type_t : size_t {
-    INPUT,
-    OUTPUT,
+    FILTERED,
+    RAW,
     GRAPH_TYPE_SIZE
 };
 
@@ -86,7 +85,7 @@ enum class option_t {
 };
 
 template <typename T>
-void operator ++(T& value, int) // T[14]
+void operator ++(T& value, int)
 {
     value = static_cast<T>(value + 1);
 }
@@ -99,7 +98,7 @@ void operator --(channel_t& value, int)
 template <class T>
 constexpr T _NAN = std::numeric_limits<T>::quiet_NaN(); // NAN
 
-const String prefix  (double value, const wchar_t *unit, size_t numder_of_decimals);
+const String prefix(double value, const wchar_t *unit, size_t number_of_decimals);
 
 class main_component;
 
@@ -141,7 +140,7 @@ private:
         { option_t::graph_paused,       { L"graph_paused",       L"0"      } }, // button_pause_graph
         { option_t::graph_left,         { L"graph_left",         L"1"      } },
         { option_t::graph_right,        { L"graph_right",        L"0"      } },
-        { option_t::graph_type,         { L"graph_type",         String{ INPUT } } },
+        { option_t::graph_type,         { L"graph_type",         String { FILTERED } } },
         // калибровка                                                      
         { option_t::calibrate,          { L"calibrate",          L"0"      } }, // checkbox_cal
         { option_t::prefix,             { L"prefix",             L"0"      } }, // combo_prefix
@@ -216,7 +215,7 @@ public:
         return std::unique_ptr<XmlElement>{ };
     }
 
-    void get_current_coef(channel_t channel, double& coeff, double& zero) {
+    void get_current_coef(const channel_t channel, double& coeff, double& zero) {
         coeff = _NAN<double>;
         zero  = _NAN<double>;
 
@@ -250,7 +249,7 @@ public:
     }
 
     // B[05][06]
-    const auto do_corrections(channel_t channel, const double raw_value) {
+    const auto do_corrections(const channel_t channel, const double raw_value) {
         auto result = _NAN<double>;
         if (isfinite(raw_value)) {
 

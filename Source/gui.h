@@ -21,7 +21,7 @@ private:
     component_calibration     _component_calibration;
     component_filter          _component_filter;
     component_graph           _component_graph;
-    theme::checkbox_left_tick _theme_left_tick; // должно быть объявлено раньше stat_controls
+    theme::checkbox_left_tick _theme_left_tick; // must be declared before stat_controls
 
     Label                      label_device_type { { }, L"Type"        },
                                label_device      { { }, L"Device"      },
@@ -143,7 +143,7 @@ public:
         */
         addAndMakeVisible(label_graph_type);
         label_graph_type.setJustificationType(Justification::right);
-        for (size_t type = INPUT; type < GRAPH_TYPE_SIZE; type++)
+        for (size_t type = FILTERED; type < GRAPH_TYPE_SIZE; type++)
         {
             addAndMakeVisible(checkboxes_graph_type[type]);
             checkboxes_graph_type[type].setRadioGroupId(1);
@@ -152,8 +152,8 @@ public:
             };
         }
 
-        checkboxes_graph_type[INPUT ].setButtonText(L"Input Buffer");
-        checkboxes_graph_type[OUTPUT].setButtonText(L"Output Buffer");
+        checkboxes_graph_type[FILTERED].setButtonText(L"Filtered Signal");
+        checkboxes_graph_type[RAW     ].setButtonText(L"Raw Signal");
 
         auto type_loaded = static_cast<graph_type_t>(_app.get_int(option_t::graph_type));
         checkboxes_graph_type[type_loaded].setToggleState(true, dontSendNotification);
@@ -404,8 +404,8 @@ public:
                 remain.removeFromTop(top_margin);
             }            
             label_graph_type.setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin));
-            checkboxes_graph_type[INPUT ].setBounds(area.removeFromTop(theme::height));
-            checkboxes_graph_type[OUTPUT].setBounds(right.removeFromTop(theme::height));
+            checkboxes_graph_type[FILTERED].setBounds(area.removeFromTop (theme::height));
+            checkboxes_graph_type[RAW     ].setBounds(right.removeFromTop(theme::height));
             remain.removeFromTop(theme::height);
         }
         remain.removeFromTop(theme::margin);
@@ -415,22 +415,25 @@ public:
 
     void timerCallback() override {
         //=========================================================================================
-        std::vector<double> rms[GRAPH_TYPE_SIZE] = { _signal.get_rms(INPUT), _signal.get_rms(OUTPUT) };
-        if (rms[INPUT].size() == 0 || rms[OUTPUT].size() == 0) return;
+        std::vector<double> rms[GRAPH_TYPE_SIZE] = { _signal.get_rms(FILTERED), _signal.get_rms(RAW) };
+        if (rms[FILTERED].size() == 0) return;
 
         if (_component_graph.is_waiting())
             _component_graph.stop_waiting();
 
-        for (auto type = INPUT; type < GRAPH_TYPE_SIZE; type ++)
+        for (auto type = FILTERED; type < GRAPH_TYPE_SIZE; type ++)
             for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
             {
-                _component_graph.enqueue(type, channel, rms[type].at(channel));
-                if (type == INPUT)
+                if (rms[type].size())
+                {
+                    _component_graph.enqueue(type, channel, rms[type].at(channel));
+                    //if (type == INPUT)
                     rms[type].at(channel) = _app.do_corrections(channel, rms[type].at(channel));
+                }
             }
 
-        rms[INPUT].push_back(abs(rms[INPUT].at(LEFT) - rms[INPUT].at(RIGHT))); // баланс вычисляется после всех корректировок
-        _signal.extremes_set(rms[INPUT]);
+        rms[FILTERED].push_back(abs(rms[FILTERED].at(LEFT) - rms[FILTERED].at(RIGHT))); // баланс вычисляется после всех корректировок
+        _signal.extremes_set(rms[FILTERED]);
 
         String printed[3];
         for (size_t line = LEFT; line < VOLUME_SIZE; line++)
@@ -438,13 +441,13 @@ public:
             std::fill_n(printed, _countof(printed), theme::empty);
             auto extremes = _signal.extremes_get(line);
 
-            if (isfinite(rms[INPUT].at(line))) printed[0] = _app.print(rms[INPUT].at(line));
-            if (isfinite(extremes[MIN]))       printed[1] = _app.print(extremes[MIN]);
-            if (isfinite(extremes[MAX]))       printed[2] = _app.print(extremes[MAX]);
+            if (isfinite(rms[FILTERED].at(line))) printed[0] = _app.print(rms[FILTERED].at(line));
+            if (isfinite(extremes[MIN]))          printed[1] = _app.print(extremes[MIN]);
+            if (isfinite(extremes[MAX]))          printed[2] = _app.print(extremes[MAX]);
 
             if (auto label = _get<Label>(stat_controls[line][VALUE])) {
                 label->setText(printed[0], dontSendNotification);
-                label->setColour(Label::textColourId, isfinite(rms[INPUT].at(line)) ? Colours::black : Colours::grey);
+                label->setColour(Label::textColourId, isfinite(rms[FILTERED].at(line)) ? Colours::black : Colours::grey);
             }
             if (auto label = _get<Label>(stat_controls[line][EXTREMES]))
                 label->setText(printed[1] + L" .. " + printed[2], dontSendNotification);

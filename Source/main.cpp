@@ -66,7 +66,7 @@ application::main_window::main_window(const String& name, application& app) :
 }
 
 //=================================================================================================
-const String prefix(const double value, const wchar_t *unit, const size_t numder_of_decimals)
+const String prefix(const double value, const wchar_t *unit, const size_t number_of_decimals)
 {
     auto   symbol    = String();
     double new_value = value;
@@ -82,7 +82,7 @@ const String prefix(const double value, const wchar_t *unit, const size_t numder
             exp += 3;
         }
     }
-    return String(new_value, static_cast<int>(numder_of_decimals)) + L" " + symbol + String(unit);
+    return String(new_value, static_cast<int>(number_of_decimals)) + L" " + symbol + String(unit);
 }
 
 START_JUCE_APPLICATION(application)

@@ -123,7 +123,7 @@ public:
                 cals = std::make_unique<XmlElement>(StringRef(L"ROWS"));
 
             auto* e  = cals->createNewChildElement(StringRef(L"ROW"));
-            auto rms = _signal.get_rms(INPUT);
+            auto rms = _signal.get_rms(FILTERED);
 
             e->setAttribute(Identifier(L"name"),        editor_cal_name.getText());
             e->setAttribute(Identifier(L"left"),        channels[LEFT ]);

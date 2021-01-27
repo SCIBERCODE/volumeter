@@ -71,8 +71,8 @@ public:
         for (const auto& display : Desktop::getInstance().getDisplays().displays)
             display_width += display.userArea.getWidth();
 
-        _graph_data[INPUT ] = std::make_unique<circular_buffer>(display_width);
-        _graph_data[OUTPUT] = std::make_unique<circular_buffer>(display_width);
+        _graph_data[FILTERED] = std::make_unique<circular_buffer>(display_width);
+        _graph_data[RAW     ] = std::make_unique<circular_buffer>(display_width);
     }
 
     void enqueue(const graph_type_t type, const channel_t channel, const double value_raw) {
