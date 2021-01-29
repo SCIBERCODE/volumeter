@@ -19,8 +19,8 @@ private:
     size_t                       _sessions_count { };
     uint64_t                     _values_count   { };
     bool                         _full           { }; // the buffer has been filled at least once
-    std::unique_ptr<value_t[]>   _buffers[CHANNEL_SIZE];
-    int32_t                      _heads  [CHANNEL_SIZE];
+    std::unique_ptr<value_t[]>   _buffers[+channel_t::__size];
+    int32_t                      _heads  [+channel_t::__size];
     const size_t                 _max_size;
 //=================================================================================================
 public:
@@ -39,49 +39,46 @@ public:
 
     void clear()
     {
-        for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++) {
-            _heads[channel] = -1;
+        for (const auto& channel : channel_t()) {
+            _heads[+channel] = -1;
 
-            if (_buffers[channel])
+            if (_buffers[+channel])
                 for (size_t k = 0; k < _max_size; k++)
-                    _buffers[channel][k] = { _NAN<double> };
+                    _buffers[+channel][k] = { _NAN<double> };
         }
     }
 
     void enqueue(const channel_t channel, const double value)
     {
-        if (_max_size && isfinite(value) && _buffers[channel])
+        if (_max_size && isfinite(value) && _buffers[+channel])
         {
-            _heads[channel] = (_heads[channel] + 1) % _max_size;
+            _heads[+channel] = (_heads[+channel] + 1) % _max_size;
 
-            if (static_cast<size_t>(_heads[channel]) == _max_size - 1)
+            if (static_cast<size_t>(_heads[+channel]) == _max_size - 1)
                 _full = true;
 
-            auto& new_value     = _buffers[channel][_heads[channel]];
+            auto& new_value     = _buffers[+channel][_heads[+channel]];
             new_value.index     = _values_count++;
             new_value.value_raw = value;
         }
     }
 
-    bool get_rms(std::array<double, VOLUME_SIZE>& rms) const
+    bool get_rms(const channel_t channel, double& value) const
     {
-        double sum [CHANNEL_SIZE] { };
-        size_t size[CHANNEL_SIZE] { };
+        if (!_full) return false;
 
-        for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
-            for (size_t k = 0; k < _max_size; ++k)
-            {
-                auto value = _buffers[channel][k];
-                if (isfinite(value.value_raw)) {
-                    sum [channel] += value.value_raw;
-                    size[channel]++;
-                }
+        double sum  { };
+        size_t size { };
+        for (size_t k = 0; k < _max_size; ++k)
+        {
+            const auto& sample = _buffers[+channel][k];
+            if (isfinite(sample.value_raw)) {
+                sum += sample.value_raw;
+                size++;
             }
-
-        if (size[LEFT] && size[RIGHT] && _full) {
-            rms[LEFT   ] = sqrt(sum[LEFT ] / size[LEFT ]);
-            rms[RIGHT  ] = sqrt(sum[RIGHT] / size[RIGHT]);
-            rms[BALANCE] = abs (sum[LEFT ] - sum[RIGHT]);
+        }
+        if (size) {
+            value = sqrt(sum / size);
             return true;
         }
         else
@@ -93,13 +90,13 @@ public:
         @return values enumeration handle used in a subsequent call to get_next_value
     */
     uint32_t get_first_value(const channel_t channel, const size_t size, double& value) { // T[35]
-        if (size == 0 || size > _max_size || _heads[channel] == -1)
+        if (size == 0 || size > _max_size || _heads[+channel] == -1)
             return false;
 
         iterator_t new_it;
 
         auto handle       = _sessions_count++;
-        new_it.pointer    = _heads[channel];
+        new_it.pointer    = _heads[+channel];
         new_it.size       = size;
         new_it.channel    = channel;
         _sessions[handle] = new_it;
@@ -122,7 +119,7 @@ public:
         auto& it = _sessions.at(handle);
         if (it.size)
         {
-            result = _buffers[it.channel][it.pointer].value_raw;
+            result = _buffers[+it.channel][it.pointer].value_raw;
             it.pointer = it.pointer == 0 ?
                 _max_size  - 1 :
                 it.pointer - 1;
@@ -141,19 +138,19 @@ public:
     }
 
     auto get_extremes(const channel_t channel, const size_t window_size) {
-        auto     result = std::make_unique<double[]>(EXTREMES_SIZE);
+        auto     result = std::make_unique<double[]>(+extremum_t::__size);
         double   value;
         uint32_t handle;
 
         handle = get_first_value(channel, window_size, value);
         if (handle != INVALID_HANDLE)
         {
-            result[MIN] = value;
-            result[MAX] = value;
+            result[+extremum_t::MIN] = value;
+            result[+extremum_t::MAX] = value;
             do {
                 if (!isfinite(value)) break;
-                result[MIN] = std::min(value, result[MIN]);
-                result[MAX] = std::max(value, result[MAX]);
+                result[+extremum_t::MIN] = std::min(value, result[+extremum_t::MIN]);
+                result[+extremum_t::MAX] = std::max(value, result[+extremum_t::MAX]);
             }
             while (get_next_value(handle, value));
         }

@@ -1,10 +1,37 @@
 // T[17]
 
-enum waiting_event_t
-{
-    device_init,
-    buffer_fill
-};
+template <class E, class = std::enable_if_t<std::is_enum<E> { }>>
+auto operator ++(E& identifier) {
+    return identifier = static_cast<E>(+identifier + 1);
+}
+
+template <class E, class = std::enable_if_t<std::is_enum<E> { }>>
+auto operator --(E& identifier) {
+    return identifier = identifier == E::__first ? E::__size : static_cast<E>(+identifier - 1);
+}
+
+template <class E, class = std::enable_if_t<std::is_enum<E> { }>>
+constexpr auto operator +(E identifier) {
+    return static_cast<typename std::underlying_type<E>::type>(identifier);
+}
+
+template <class E, class = std::enable_if_t<std::is_enum<E> { }>>
+auto operator *(E identifier) {
+    return identifier;
+}
+
+template <class E, class = std::enable_if_t<std::is_enum<E> { }>>
+auto begin(E) {
+    return E::__first;
+}
+
+template <class E, class = std::enable_if_t<std::is_enum<E> { }>>
+auto end(E) {
+    auto last = E::__last;
+    return ++last;
+}
+
+//=================================================================================================
 
 const std::map<int, String> __prefs { // T[18]
     { -15, L"f"      },
@@ -17,45 +44,63 @@ const std::map<int, String> __prefs { // T[18]
     {   6, L"M"      }
 };
 
-enum channel_t : size_t {
+enum class waiting_event_t
+{
+    device_init,
+    buffer_fill
+};
+
+enum class channel_t : size_t {
     LEFT,
     RIGHT,
-    CHANNEL_SIZE
+    __size,
+    __first = LEFT,
+    __last  = RIGHT
 };
 
-enum volume_t : size_t {
-    BALANCE = CHANNEL_SIZE,
-    VOLUME_SIZE
+enum class volume_t : size_t {
+    BALANCE = +channel_t::__size,
+    __size,
+    __first = +channel_t::LEFT,
+    __last  = BALANCE
 };
 
-const std::map<size_t, String> __channels_name {
-    { LEFT,  L"Left"  },
-    { RIGHT, L"Right" }
+const std::map<channel_t, String> __channels_name {
+    { channel_t::LEFT,  L"Left"  },
+    { channel_t::RIGHT, L"Right" }
 };
 
-enum extremum_t : size_t {
+enum class extremum_t : size_t {
     MIN,
     MAX,
-    EXTREMES_SIZE
+    __size,
+    __first = MIN,
+    __last  = MAX
 };
 
-enum filter_type_t : size_t {
+enum class filter_type_t : size_t {
     HIGH_PASS,
     LOW_PASS,
-    FILTER_TYPE_SIZE
+    __size,
+    __first = HIGH_PASS,
+    __last  = LOW_PASS
 };
 
-enum graph_type_t : size_t {
+enum class graph_type_t : size_t {
     FILTERED,
     RAW,
-    GRAPH_TYPE_SIZE
+    __size,
+    __first = FILTERED,
+    __last  = RAW
 };
 
-enum labels_stat_column_t : size_t {
+enum class labels_stat_column_t : size_t {
     LABEL,
     VALUE,
     EXTREMES,
-    LABELS_STAT_COLUMN_SIZE
+    __size,
+    __first = LABEL,
+    __last  = EXTREMES
 };
 
 enum class option_t {
@@ -83,17 +128,6 @@ enum class option_t {
     pass_high_order,
     pass_low_order,
 };
-
-template <typename T>
-void operator ++(T& value, int)
-{
-    value = static_cast<T>(value + 1);
-}
-
-void operator --(channel_t& value, int)
-{
-    value = value == 0 ? CHANNEL_SIZE : static_cast<channel_t>(value - 1);
-}
 
 template <class T>
 constexpr T _NAN = std::numeric_limits<T>::quiet_NaN(); // NAN
@@ -136,23 +170,23 @@ private:
         { option_t::zero,               { L"zero",               L"0"      } }, // button_zero
         { option_t::zero_value_left,    { L"zero_value_left",    L"0"      } },
         { option_t::zero_value_right,   { L"zero_value_right",   L"0"      } },
-        // график                                                          
+        // graph                                                          
         { option_t::graph_paused,       { L"graph_paused",       L"0"      } }, // button_pause_graph
         { option_t::graph_left,         { L"graph_left",         L"1"      } },
         { option_t::graph_right,        { L"graph_right",        L"0"      } },
-        { option_t::graph_type,         { L"graph_type",         String { FILTERED } } },
-        // калибровка                                                      
+        { option_t::graph_type,         { L"graph_type",         String { +graph_type_t::FILTERED } } },
+        // calibrations                                                      
         { option_t::calibrate,          { L"calibrate",          L"0"      } }, // checkbox_cal
         { option_t::prefix,             { L"prefix",             L"0"      } }, // combo_prefix
         { option_t::calibrations,       { L"calibrations",       { }       } },
         { option_t::calibrations_index, { L"calibrations_index", L"-1"     } },
-        // фильтры                                                         
+        // filters                                                         
         { option_t::pass_high,          { L"pass_high",          L"0"      } },
         { option_t::pass_low,           { L"pass_low",           L"0"      } },
         { option_t::pass_high_freq,     { L"pass_high_freq",     { }       } },
         { option_t::pass_low_freq,      { L"pass_low_freq",      { }       } },
-        { option_t::pass_high_order,    { L"pass_high_order",    L"120"    } },
-        { option_t::pass_low_order,     { L"pass_low_order",     L"120"    } },
+        { option_t::pass_high_order,    { L"pass_high_order",    L"20"     } },
+        { option_t::pass_low_order,     { L"pass_low_order",     L"20"     } },
     };
 
     std::unique_ptr<main_window>  _main_window;
@@ -227,7 +261,7 @@ public:
                 forEachXmlChildElement(*cals, el)
                 {
                     if (k == cal_index) {
-                        if (channel == LEFT)
+                        if (channel == channel_t::LEFT)
                             coeff = el->getDoubleAttribute(Identifier(L"left_coeff"));
                         else
                             coeff = el->getDoubleAttribute(Identifier(L"right_coeff"));
@@ -238,7 +272,7 @@ public:
             }
         }
         if (get_int(option_t::zero))
-            if (channel == LEFT)
+            if (channel == channel_t::LEFT)
                 zero = get_text(option_t::zero_value_left).getDoubleValue();
             else
                 zero = get_text(option_t::zero_value_right).getDoubleValue();
@@ -273,7 +307,7 @@ public:
     }
 
     const String print(const double corrected_value) {
-        get_current_coef(LEFT, _coeff, _zero);
+        get_current_coef(channel_t::LEFT, _coeff, _zero);
 
         if (isfinite(_coeff))
             return prefix(corrected_value, L"V", 5); // T[15]

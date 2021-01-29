@@ -34,7 +34,7 @@ private:
 
     Rectangle<int>                   _plot;
     Rectangle<int>                   _plot_indented;
-    std::unique_ptr<circular_buffer> _graph_data[GRAPH_TYPE_SIZE]; // B[03]
+    std::unique_ptr<circular_buffer> _graph_data[+graph_type_t::__size]; // B[03]
     RectangleList<int>               _placed_extremes;
     waiting_t                        _wait;
     signal                         & _signal;
@@ -54,7 +54,7 @@ public:
         _wait.stub_text->setJustificationType(Justification::centred);
         _wait.stub_text->setFont(_wait.stub_text->getFont().boldened());
         _wait.stub_text->setColour(Label::backgroundColourId, Colours::white);
-        _wait.stub_text->setText(get_timer_text(device_init), dontSendNotification);
+        _wait.stub_text->setText(get_timer_text(waiting_event_t::device_init), dontSendNotification);
 
         _wait.progress_bar->setColour(ProgressBar::ColourIds::backgroundColourId, Colours::transparentBlack);
         _wait.progress_bar->setPercentageDisplay(false);
@@ -71,16 +71,16 @@ public:
         for (const auto& display : Desktop::getInstance().getDisplays().displays)
             display_width += display.userArea.getWidth();
 
-        _graph_data[FILTERED] = std::make_unique<circular_buffer>(display_width);
-        _graph_data[RAW     ] = std::make_unique<circular_buffer>(display_width);
+        _graph_data[+graph_type_t::FILTERED] = std::make_unique<circular_buffer>(display_width);
+        _graph_data[+graph_type_t::RAW     ] = std::make_unique<circular_buffer>(display_width);
     }
 
     void enqueue(const graph_type_t type, const channel_t channel, const double value_raw) {
         if (_app.get_int(option_t::graph_paused) == 0) {
             if (isfinite(value_raw)) {
-                _graph_data[type]->enqueue(channel, value_raw);
+                _graph_data[+type]->enqueue(channel, value_raw);
 
-                if (channel == RIGHT)
+                if (channel == channel_t::RIGHT)
                     repaint(); // T[24]
             }
         }
@@ -102,7 +102,7 @@ public:
         _wait.running     = false;
         _wait.stub_bg     ->setVisible(false);
         _wait.stub_text   ->setVisible(false);
-        _wait.stub_text   ->setText(get_timer_text(device_init), dontSendNotification);
+        _wait.stub_text   ->setText(get_timer_text(waiting_event_t::device_init), dontSendNotification);
         _wait.progress_bar->setVisible(false);
         stopTimer();
     }
@@ -125,7 +125,7 @@ public:
         if (_plot_indented.isEmpty())
             return;
 
-        buff_handle = _graph_data[type]->get_first_value(channel, _plot.getWidth(), value); // B[04]
+        buff_handle = _graph_data[+type]->get_first_value(channel, _plot.getWidth(), value); // B[04]
         if (buff_handle == circular_buffer::INVALID_HANDLE)
             return;
 
@@ -139,7 +139,7 @@ public:
 
             path.lineTo(x, y);
 
-            if (!_graph_data[type]->get_next_value(buff_handle, value))
+            if (!_graph_data[+type]->get_next_value(buff_handle, value))
                 break;
         }
         auto length = path.getLength();
@@ -162,7 +162,7 @@ public:
             return;
 
         path.applyTransform(transform);
-        g.setColour(channel == LEFT ? Colours::black : Colours::green);
+        g.setColour(channel == channel_t::LEFT ? Colours::black : Colours::green);
         g.strokePath(path, PathStrokeType(1.0f + subpixel_correction));
     }
 
@@ -174,18 +174,18 @@ public:
         //=========================================================================================
         double   value;
         auto     width    = _plot.getWidth();
-        auto     extremes = _graph_data[type]->get_extremes(channel, width);
+        auto     extremes = _graph_data[+type]->get_extremes(channel, width);
         uint32_t buff_handle;
 
-        for (auto extremum = MIN; extremum < EXTREMES_SIZE; extremum++)
+        for (auto const& extremum : extremum_t())
         {
-            buff_handle = _graph_data[type]->get_first_value(channel, width, value);
+            buff_handle = _graph_data[+type]->get_first_value(channel, width, value);
             if (buff_handle == circular_buffer::INVALID_HANDLE)
                 continue;
 
             for (size_t offset = 0; ; offset++) // T[30]
             {
-                if (value == extremes[extremum])
+                if (value == extremes[+extremum])
                 {
                     auto value_corrected = _app.do_corrections(channel, value);
                     if (!isfinite(value_corrected)) break;
@@ -196,7 +196,7 @@ public:
                     Rectangle<int> rect
                     (
                         _plot.getRight() - offset - (text_width / 2),
-                        extremum == MAX ? _plot.getY() + 1 : _plot_indented.getBottom() + 1,
+                        extremum == extremum_t::MAX ? _plot.getY() + 1 : _plot_indented.getBottom() + 1,
                         text_width,
                         13
                     );
@@ -209,19 +209,19 @@ public:
 
                     // правый график превалирует над левым, экстремумы левого не отображаются вовсе в случае
                     // даже частичного перекрытия значениями правого
-                    if (channel == RIGHT || (channel == LEFT && !_placed_extremes.intersectsRectangle(rect))) // T[31]
+                    if (channel == channel_t::RIGHT || (channel == channel_t::LEFT && !_placed_extremes.intersectsRectangle(rect))) // T[31]
                     {
                         g.setColour(Colours::white);
                         g.fillRect(rect);
-                        g.setColour(channel == LEFT ? Colours::black : Colours::green);
+                        g.setColour(channel == channel_t::LEFT ? Colours::black : Colours::green);
                         g.drawText(text, rect, Justification::centred, false);
                     }
-                    if (channel == RIGHT)
+                    if (channel == channel_t::RIGHT)
                         _placed_extremes.add(rect);
 
                     break; // T[32]
                 }
-                if (!_graph_data[type]->get_next_value(buff_handle, value))
+                if (!_graph_data[+type]->get_next_value(buff_handle, value))
                     break;
 
             }
@@ -241,11 +241,11 @@ public:
             _plot_indented.getWidth(),
             13
         );
-        for (auto channel = LEFT; channel <= RIGHT; channel++)
+        for (auto const& channel : channel_t())
         {
             const auto text = __channels_name.at(channel);
             const auto text_width = g.getCurrentFont().getStringWidth(text);
-            g.setColour(channel == LEFT ? Colours::black : Colours::green);
+            g.setColour(channel == channel_t::LEFT ? Colours::black : Colours::green);
             g.drawFittedText(text, rect.removeFromLeft(text_width + theme::margin), Justification::centredLeft, 1);
             auto rect_float = rect.removeFromLeft(line_width);
             g.fillRect(rect_float.toFloat().withY(rect.getY() + 1.0f).reduced(0, 5.6f));
@@ -270,17 +270,17 @@ public:
     }
 
     String get_timer_text(waiting_event_t event) {
-        if (event == buffer_fill)
+        if (event == waiting_event_t::buffer_fill)
         {
             auto remain = _wait.remain_ms >= _wait.timer_value_ms ?
-                String(_wait.remain_ms / 1000.0f, 1) + L" sec" : L"";
+                String(_wait.remain_ms / 1000.0f, 1) + L" sec" : String();
             return L"Waiting for the buffer to fill... " + remain;
         }
-        if (event == device_init)
+        if (event == waiting_event_t::device_init)
         {
             return L"Device initialization...";
         }
-        return "";
+        return String();
     }
 
     //=============================================================================================
@@ -314,10 +314,10 @@ public:
         auto type = static_cast<graph_type_t>(_app.get_int(option_t::graph_type));
 
         _placed_extremes.clear();
-        for (auto channel = RIGHT; channel < CHANNEL_SIZE; channel--)
+        for (auto channel = channel_t::RIGHT; channel < channel_t::__size; --channel)
         {
-            if (channel == LEFT  && _app.get_int(option_t::graph_left ) == 0) continue;
-            if (channel == RIGHT && _app.get_int(option_t::graph_right) == 0) continue;
+            if (channel == channel_t::LEFT  && _app.get_int(option_t::graph_left ) == 0) continue;
+            if (channel == channel_t::RIGHT && _app.get_int(option_t::graph_right) == 0) continue;
 
             draw_graph_line(type, channel, g);
             draw_extremes  (type, channel, g);

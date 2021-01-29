@@ -32,8 +32,8 @@ private:
     TooltipWindow              hint              { this, 500           };
     TextButton                 button_stat_reset, button_pause_graph, button_zero;
     ComboBox                   combo_dev_types, combo_dev_outputs, combo_dev_rates, combo_buff_size, combo_tone;
-    controls_t                 stat_controls        [VOLUME_SIZE    ][LABELS_STAT_COLUMN_SIZE];
-    ToggleButton               checkboxes_graph_type[GRAPH_TYPE_SIZE];
+    controls_t                 stat_controls        [+volume_t    ::__size][+labels_stat_column_t::__size];
+    ToggleButton               checkboxes_graph_type[+graph_type_t::__size];
 //=================================================================================================
 public:
     main_component(application& app) :
@@ -85,40 +85,40 @@ public:
         /** =======================================================================================
             statistics
         */
-        for (size_t line = LEFT; line < VOLUME_SIZE; line++) {
-            for (auto column = LABEL; column < LABELS_STAT_COLUMN_SIZE; column++)
-                if (column == LABEL)
+        for (auto const& line : volume_t()) {
+            for (auto const& column : labels_stat_column_t())
+                if (column == labels_stat_column_t::LABEL)
                 {
                     // создание галочек выбора каналов для отображения на графике
-                    if (line == LEFT || line == RIGHT)
+                    if (+line == +channel_t::LEFT || +line == +channel_t::RIGHT)
                     {
                         auto       checkbox     = std::make_shared<ToggleButton>();
                         auto&      props        = checkbox->getProperties();
-                        const auto channel_name = __channels_name.at(line).toLowerCase();
-                        const auto option_name = line == LEFT ? option_t::graph_left : option_t::graph_right;
+                        const auto channel_name = __channels_name.at(static_cast<channel_t>(line)).toLowerCase();
+                        const auto option_name = +line == +channel_t::LEFT ? option_t::graph_left : option_t::graph_right;
 
-                        checkbox->setButtonText(__channels_name.at(line));
+                        checkbox->setButtonText(__channels_name.at(static_cast<channel_t>(line)));
                         checkbox->setLookAndFeel(&_theme_left_tick);
                         checkbox->setTooltip(L"Show the " + channel_name + L" channel on the graph");
 
                         checkbox->setToggleState (_app.get_int(option_name), dontSendNotification);
                         checkbox->onClick = [=]
                         {
-                            if (auto control = _get<ToggleButton>(stat_controls[line][column]))
+                            if (auto control = _get<ToggleButton>(stat_controls[+line][+column]))
                                 _app.save(option_name, control->getToggleState());
                         };
 
-                        if (line == RIGHT)
+                        if (+line == +channel_t::RIGHT)
                             props.set(Identifier(L"color"), static_cast<int>(Colours::green.getARGB()));
 
-                        stat_controls[line][column] = checkbox;
+                        stat_controls[+line][+column] = checkbox;
                         addAndMakeVisible(*checkbox);
                     }
-                    if (line == BALANCE) {
+                    if (line == volume_t::BALANCE) {
                         auto label = std::make_shared<Label>();
                         label->setText(L"Balance", dontSendNotification);
                         label->setJustificationType(Justification::centredRight);
-                        stat_controls[line][column] = label;
+                        stat_controls[+line][+column] = label;
                         addAndMakeVisible(*label);
                     }
                 }
@@ -127,13 +127,13 @@ public:
                     // T[01]
                     auto label = std::make_shared<Label>();
 
-                    if (column == VALUE)
+                    if (column == labels_stat_column_t::VALUE)
                         label->setFont(label->getFont().boldened());
-                    if (column == EXTREMES)
+                    if (column == labels_stat_column_t::EXTREMES)
                         label->setJustificationType(Justification::right);
 
                     label->setText(theme::empty, dontSendNotification);
-                    stat_controls[line][column] = label;
+                    stat_controls[+line][+column] = label;
                     addAndMakeVisible(*label);
                 }
         }
@@ -143,20 +143,20 @@ public:
         */
         addAndMakeVisible(label_graph_type);
         label_graph_type.setJustificationType(Justification::right);
-        for (size_t type = FILTERED; type < GRAPH_TYPE_SIZE; type++)
+        for (auto const& type : graph_type_t())
         {
-            addAndMakeVisible(checkboxes_graph_type[type]);
-            checkboxes_graph_type[type].setRadioGroupId(1);
-            checkboxes_graph_type[type].onClick = [this, type] {
+            addAndMakeVisible(checkboxes_graph_type[+type]);
+            checkboxes_graph_type[+type].setRadioGroupId(1);
+            checkboxes_graph_type[+type].onClick = [this, type] {
                 _app.save(option_t::graph_type, static_cast<int>(type));
             };
         }
 
-        checkboxes_graph_type[FILTERED].setButtonText(L"Filtered Signal");
-        checkboxes_graph_type[RAW     ].setButtonText(L"Raw Signal");
+        checkboxes_graph_type[+graph_type_t::FILTERED].setButtonText(L"Filtered Signal");
+        checkboxes_graph_type[+graph_type_t::RAW     ].setButtonText(L"Raw Signal");
 
         auto type_loaded = static_cast<graph_type_t>(_app.get_int(option_t::graph_type));
-        checkboxes_graph_type[type_loaded].setToggleState(true, dontSendNotification);
+        checkboxes_graph_type[+type_loaded].setToggleState(true, dontSendNotification);
 
         /** =======================================================================================
             bellow the graph
@@ -377,35 +377,35 @@ public:
             auto right = area.removeFromRight(getWidth() / 2);
             right.removeFromRight(theme::margin * 2);
 
-            for (size_t line_index = LEFT; line_index < VOLUME_SIZE; line_index++)
+            for (auto const& line_index : volume_t())
             {
-                if (line_index == LEFT || line_index == RIGHT) {
-                    if (auto checkbox = _get<ToggleButton>(stat_controls[line_index][LABEL]))
+                if (+line_index == +channel_t::LEFT || +line_index == +channel_t::RIGHT) {
+                    if (auto checkbox = _get<ToggleButton>(stat_controls[+line_index][+labels_stat_column_t::LABEL]))
                         checkbox->setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin));
                 }
                 else {
-                    if (auto label_balance = _get<Label>(stat_controls[line_index][LABEL]))
+                    if (auto label_balance = _get<Label>(stat_controls[+line_index][+labels_stat_column_t::LABEL]))
                         label_balance->setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin - 3)); // T[03]
                 }
 
-                if (auto label = _get<Label>(stat_controls[line_index][VALUE]))
+                if (auto label = _get<Label>(stat_controls[+line_index][+labels_stat_column_t::VALUE]))
                     label->setBounds(area.removeFromTop(theme::height));
 
-                if (auto label = _get<Label>(stat_controls[line_index][EXTREMES]))
+                if (auto label = _get<Label>(stat_controls[+line_index][+labels_stat_column_t::EXTREMES]))
                     label->setBounds(right.removeFromTop(theme::height));
 
                 remain.removeFromTop(theme::height);
 
                 auto top_margin = theme::margin;
-                if (line_index == BALANCE) top_margin *= 3; // for the graph_type
+                if (line_index == volume_t::BALANCE) top_margin *= 3; // for the graph_type
                 area.removeFromTop  (top_margin);
                 right.removeFromTop (top_margin);
                 left.removeFromTop  (top_margin);
                 remain.removeFromTop(top_margin);
             }            
             label_graph_type.setBounds(left.removeFromTop(theme::height).withTrimmedRight(theme::margin));
-            checkboxes_graph_type[FILTERED].setBounds(area.removeFromTop (theme::height));
-            checkboxes_graph_type[RAW     ].setBounds(right.removeFromTop(theme::height));
+            checkboxes_graph_type[+graph_type_t::FILTERED].setBounds(area.removeFromTop (theme::height));
+            checkboxes_graph_type[+graph_type_t::RAW     ].setBounds(right.removeFromTop(theme::height));
             remain.removeFromTop(theme::height);
         }
         remain.removeFromTop(theme::margin);
@@ -415,41 +415,39 @@ public:
 
     void timerCallback() override {
         //=========================================================================================
-        std::vector<double> rms[GRAPH_TYPE_SIZE] = { _signal.get_rms(FILTERED), _signal.get_rms(RAW) };
-        if (rms[FILTERED].size() == 0) return;
+        std::vector<double> rms[] = { _signal.get_rms(graph_type_t::FILTERED), _signal.get_rms(graph_type_t::RAW) };
+        if (rms[+graph_type_t::FILTERED].size() == 0) return;
 
         if (_component_graph.is_waiting())
             _component_graph.stop_waiting();
 
-        for (auto type = FILTERED; type < GRAPH_TYPE_SIZE; type ++)
-            for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
-            {
-                if (rms[type].size())
+        for (auto const& type : graph_type_t())
+            for (auto const& channel : channel_t())
+                if (rms[+type].size())
                 {
-                    _component_graph.enqueue(type, channel, rms[type].at(channel));
-                    //if (type == INPUT)
-                    rms[type].at(channel) = _app.do_corrections(channel, rms[type].at(channel));
+                    _component_graph.enqueue(type, channel, rms[+type].at(+channel));
+                    //if (type == graph_type_t::FILTERED)
+                    rms[+type].at(+channel) = _app.do_corrections(channel, rms[+type].at(+channel));
                 }
-            }
 
-        rms[FILTERED].push_back(abs(rms[FILTERED].at(LEFT) - rms[FILTERED].at(RIGHT))); // баланс вычисляется после всех корректировок
-        _signal.extremes_set(rms[FILTERED]);
+        rms[+graph_type_t::FILTERED].push_back(abs(rms[+graph_type_t::FILTERED].at(+channel_t::LEFT) - rms[+graph_type_t::FILTERED].at(+channel_t::RIGHT))); // баланс вычисляется после всех корректировок
+        _signal.extremes_set(rms[+graph_type_t::FILTERED]);
 
         String printed[3];
-        for (size_t line = LEFT; line < VOLUME_SIZE; line++)
+        for (auto const& line : volume_t())
         {
             std::fill_n(printed, _countof(printed), theme::empty);
-            auto extremes = _signal.extremes_get(line);
+            auto extremes = _signal.extremes_get(+line);
 
-            if (isfinite(rms[FILTERED].at(line))) printed[0] = _app.print(rms[FILTERED].at(line));
-            if (isfinite(extremes[MIN]))          printed[1] = _app.print(extremes[MIN]);
-            if (isfinite(extremes[MAX]))          printed[2] = _app.print(extremes[MAX]);
+            if (isfinite(rms[+graph_type_t::FILTERED].at(+line))) printed[0] = _app.print(rms[+graph_type_t::FILTERED].at(+line));
+            if (isfinite(extremes[+extremum_t::MIN]))             printed[1] = _app.print(extremes[+extremum_t::MIN]);
+            if (isfinite(extremes[+extremum_t::MAX]))             printed[2] = _app.print(extremes[+extremum_t::MAX]);
 
-            if (auto label = _get<Label>(stat_controls[line][VALUE])) {
+            if (auto label = _get<Label>(stat_controls[+line][+labels_stat_column_t::VALUE])) {
                 label->setText(printed[0], dontSendNotification);
-                label->setColour(Label::textColourId, isfinite(rms[FILTERED].at(line)) ? Colours::black : Colours::grey);
+                label->setColour(Label::textColourId, isfinite(rms[+graph_type_t::FILTERED].at(+line)) ? Colours::black : Colours::grey);
             }
-            if (auto label = _get<Label>(stat_controls[line][EXTREMES]))
+            if (auto label = _get<Label>(stat_controls[+line][+labels_stat_column_t::EXTREMES]))
                 label->setText(printed[1] + L" .. " + printed[2], dontSendNotification);
         }
     }

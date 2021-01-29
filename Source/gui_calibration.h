@@ -15,8 +15,8 @@ private:
     struct cal_t
     {
         String name;
-        double channels[CHANNEL_SIZE];
-        double coeffs  [CHANNEL_SIZE];
+        double channels[+channel_t::__size];
+        double coeffs  [+channel_t::__size];
     };
 
     const std::vector<column_t> _columns
@@ -38,7 +38,7 @@ private:
                         label_cal_channels { { }, L"Left/Right"      };
     TableListBox        table_cals;
     TextEditor          editor_cal_name;
-    TextEditor          editor_cal_channels[CHANNEL_SIZE];
+    TextEditor          editor_cal_channels[+channel_t::__size];
     ComboBox            combo_prefix;
     TextButton          button_cal_add;
 //=================================================================================================
@@ -92,7 +92,7 @@ public:
         editor_cal_channels[0].onTextChange();
 
         label_cal_add.attachToComponent(&editor_cal_name, true);
-        label_cal_channels.attachToComponent(&editor_cal_channels[LEFT], true);
+        label_cal_channels.attachToComponent(&editor_cal_channels[+channel_t::LEFT], true);
         editor_cal_name.setTextToShowWhenEmpty(L"Calibration name (optional)", Colours::grey);
         for (auto const& pref : __prefs)
             combo_prefix.addItem(pref.second + L"V", pref.first + 1);
@@ -107,15 +107,15 @@ public:
         button_cal_add.setButtonText(L"Add");
         button_cal_add.onClick = [=]
         {
-            double channels[CHANNEL_SIZE];
+            double channels[+channel_t::__size];
             const auto pref = _app.get_int(option_t::prefix);
 
-            for (auto channel = LEFT; channel < CHANNEL_SIZE; channel++)
+            for (auto const& channel : channel_t())
             {
-                auto channel_text = editor_cal_channels[channel].getText();
+                auto channel_text = editor_cal_channels[+channel].getText();
                 if (channel_text.isEmpty())
                     return;
-                channels[channel] = channel_text.getDoubleValue() * pow(10.0, pref);
+                channels[+channel] = channel_text.getDoubleValue() * pow(10.0, pref);
             }
 
             auto cals = _app.get_xml(option_t::calibrations);
@@ -123,13 +123,13 @@ public:
                 cals = std::make_unique<XmlElement>(StringRef(L"ROWS"));
 
             auto* e  = cals->createNewChildElement(StringRef(L"ROW"));
-            auto rms = _signal.get_rms(FILTERED);
+            auto rms = _signal.get_rms(graph_type_t::FILTERED);
 
             e->setAttribute(Identifier(L"name"),        editor_cal_name.getText());
-            e->setAttribute(Identifier(L"left"),        channels[LEFT ]);
-            e->setAttribute(Identifier(L"left_coeff"),  channels[LEFT ] / rms.at(LEFT ));
-            e->setAttribute(Identifier(L"right"),       channels[RIGHT]);
-            e->setAttribute(Identifier(L"right_coeff"), channels[RIGHT] / rms.at(RIGHT)); // T[04]
+            e->setAttribute(Identifier(L"left"),        channels[+channel_t::LEFT ]);
+            e->setAttribute(Identifier(L"left_coeff"),  channels[+channel_t::LEFT ] / rms.at(+channel_t::LEFT));
+            e->setAttribute(Identifier(L"right"),       channels[+channel_t::RIGHT]);
+            e->setAttribute(Identifier(L"right_coeff"), channels[+channel_t::RIGHT] / rms.at(+channel_t::RIGHT)); // T[04]
 
             _app.save(option_t::calibrations, cals.get());
             update();
@@ -158,7 +158,7 @@ public:
     };
 
     double get_coeff(const channel_t channel) {
-        return _selected == -1 ? 1.0 : _rows.at(_selected).coeffs[channel];
+        return _selected == -1 ? 1.0 : _rows.at(_selected).coeffs[+channel];
     }
 
     void delete_row(const int del_row)
@@ -188,10 +188,10 @@ public:
         {
             auto* e = cals->createNewChildElement(StringRef(L"ROW"));
             e->setAttribute(Identifier(L"name"),        row.name);
-            e->setAttribute(Identifier(L"left"),        row.channels[LEFT ]);
-            e->setAttribute(Identifier(L"left_coeff"),  row.coeffs  [LEFT ]);
-            e->setAttribute(Identifier(L"right"),       row.channels[RIGHT]);
-            e->setAttribute(Identifier(L"right_coeff"), row.coeffs  [RIGHT]);
+            e->setAttribute(Identifier(L"left"),        row.channels[+channel_t::LEFT ]);
+            e->setAttribute(Identifier(L"left_coeff"),  row.coeffs  [+channel_t::LEFT ]);
+            e->setAttribute(Identifier(L"right"),       row.channels[+channel_t::RIGHT]);
+            e->setAttribute(Identifier(L"right_coeff"), row.coeffs  [+channel_t::RIGHT]);
         }
         _app.save(option_t::calibrations, cals.get());
     }
@@ -239,9 +239,9 @@ public:
         String text(theme::empty);
 
         switch (data_selector) {
-        case cell_data_t::name:  text = _rows.at(row).name;                            break;
-        case cell_data_t::left:  text = prefix(_rows.at(row).channels[LEFT],  L"V", 0); break;
-        case cell_data_t::right: text = prefix(_rows.at(row).channels[RIGHT], L"V", 0); break;
+        case cell_data_t::name:  text = _rows.at(row).name;                                         break;
+        case cell_data_t::left:  text = prefix(_rows.at(row).channels[+channel_t::LEFT],  L"V", 0); break;
+        case cell_data_t::right: text = prefix(_rows.at(row).channels[+channel_t::RIGHT], L"V", 0); break;
         }
 
         auto text_color = getLookAndFeel().findColour(ListBox::textColourId);
@@ -262,9 +262,9 @@ public:
         line.removeFromLeft(theme::label_width);
         button_cal_add.setBounds(line.removeFromRight(theme::button_width));
         auto edit_width = line.getWidth() / 3;
-        editor_cal_channels[LEFT].setBounds(line.removeFromLeft(edit_width - 5));
+        editor_cal_channels[+channel_t::LEFT ].setBounds(line.removeFromLeft(edit_width - 5));
         line.removeFromLeft(theme::margin);
-        editor_cal_channels[RIGHT].setBounds(line.removeFromLeft(edit_width - 5));
+        editor_cal_channels[+channel_t::RIGHT].setBounds(line.removeFromLeft(edit_width - 5));
         line.removeFromLeft(theme::margin); // B[09]
         line.removeFromRight(theme::margin);
         combo_prefix.setBounds(line);

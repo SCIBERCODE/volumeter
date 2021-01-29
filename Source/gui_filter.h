@@ -4,17 +4,17 @@
 class component_filter : public Component {
 //=================================================================================================
 private:
-    const int _order_list[14] { 1, 2, 4, 10, 20, 40, 60, 80, 100, 120, 140, 200, 300, 500 };
+    const int _order_list[10] { 1, 2, 4, 10, 20, 30, 40, 60, 80, 100 };
 
     signal                        & _signal;
     application                   & _app;
     theme::checkbox_right_tick      _theme_right;
 
-    GroupComponent                   group        { { }, L"Filter(s)" };
-    std::unique_ptr<ToggleButton>    checkboxes_type[FILTER_TYPE_SIZE];
-    std::unique_ptr<Label>           labels_desc    [FILTER_TYPE_SIZE];
-    std::unique_ptr<TextEditor>      edits_freq     [FILTER_TYPE_SIZE];
-    std::unique_ptr<ComboBox>        combos_order   [FILTER_TYPE_SIZE];
+    GroupComponent                   group          { { }, L"Filter(s)"    };
+    std::unique_ptr<ToggleButton>    checkboxes_type[+filter_type_t::__size];
+    std::unique_ptr<Label>           labels_desc    [+filter_type_t::__size];
+    std::unique_ptr<TextEditor>      edits_freq     [+filter_type_t::__size];
+    std::unique_ptr<ComboBox>        combos_order   [+filter_type_t::__size];
 //=================================================================================================
 public:
 
@@ -24,21 +24,21 @@ public:
     {
         addAndMakeVisible(group);
 
-        for (auto type = HIGH_PASS; type < FILTER_TYPE_SIZE; type++)
+        for (auto const& type : filter_type_t())
         {
-            checkboxes_type[type] = std::make_unique<ToggleButton>(type == HIGH_PASS ? L"High pass" : L"Low pass");
-            labels_desc    [type] = std::make_unique<Label>();
-            edits_freq     [type] = std::make_unique<TextEditor>();
-            combos_order   [type] = std::make_unique<ComboBox>();
+            checkboxes_type[+type] = std::make_unique<ToggleButton>(type == filter_type_t::HIGH_PASS ? L"High pass" : L"Low pass");
+            labels_desc    [+type] = std::make_unique<Label>();
+            edits_freq     [+type] = std::make_unique<TextEditor>();
+            combos_order   [+type] = std::make_unique<ComboBox>();
 
-            auto button = checkboxes_type[type].get();
-            auto label  = labels_desc    [type].get();
-            auto edit   = edits_freq     [type].get();
-            auto combo  = combos_order   [type].get();
+            auto button = checkboxes_type[+type].get();
+            auto label  = labels_desc    [+type].get();
+            auto edit   = edits_freq     [+type].get();
+            auto combo  = combos_order   [+type].get();
 
-            const auto option       = type == HIGH_PASS ? option_t::pass_high       : option_t::pass_low;
-            const auto option_freq  = type == HIGH_PASS ? option_t::pass_high_freq  : option_t::pass_low_freq;
-            const auto option_order = type == HIGH_PASS ? option_t::pass_high_order : option_t::pass_low_order;
+            const auto option       = type == filter_type_t::HIGH_PASS ? option_t::pass_high       : option_t::pass_low;
+            const auto option_freq  = type == filter_type_t::HIGH_PASS ? option_t::pass_high_freq  : option_t::pass_low_freq;
+            const auto option_order = type == filter_type_t::HIGH_PASS ? option_t::pass_high_order : option_t::pass_low_order;
 
             addAndMakeVisible(button);
             addAndMakeVisible(label);
@@ -48,9 +48,9 @@ public:
             // галка включения фильтра
             button->setToggleState(_app.get_int(option), dontSendNotification);
             button->setLookAndFeel(&_theme_right);
-            button->onClick = [&, type, option]
+            button->onClick = [&, type, option] // T[12]
             {
-                _app.save(option, checkboxes_type[type]->getToggleState());
+                _app.save(option, checkboxes_type[+type]->getToggleState());
                 _signal.filter_init(type);
             };
             // поле для ввода частоты
@@ -69,8 +69,8 @@ public:
 
             edit->onTextChange = [this, type, option_freq, check_input] // T[12]
             {
-                auto value = edits_freq[type]->getText();
-                if (check_input(checkboxes_type[type].get(), value) || value.isEmpty()) {
+                auto value = edits_freq[+type]->getText();
+                if (check_input(checkboxes_type[+type].get(), value) || value.isEmpty()) {
                     _app.save(option_freq, value);
                     _signal.filter_init(type);
                 }
@@ -81,14 +81,14 @@ public:
             if (check_input(button, value))
                 edit->setText(value, true);
 
-            // порядок фильтра
+            // filter order
             for (auto const item : _order_list)
                 combo->addItem(String(item), item);
 
             combo->setSelectedId(_app.get_int(option_order), dontSendNotification);
-            combo->onChange = [&, type, option]
+            combo->onChange = [this, type, option_order]
             {
-                auto value = combos_order[type]->getSelectedId();
+                auto value = combos_order[+type]->getSelectedId();
                 _app.save(option_order, value);
                 _signal.set_order(type, value);
                 _signal.filter_init(type);
@@ -105,17 +105,17 @@ public:
         //=========================================================================================
         auto area = getLocalBounds().reduced(theme::margin);
         area.removeFromTop(theme::height + theme::margin);
-        for (auto type = HIGH_PASS; type < FILTER_TYPE_SIZE; type++)
+        for (auto const& type : filter_type_t())
         {
             auto line = area.removeFromTop(theme::height);
             line.removeFromRight(theme::margin);
-            combos_order[type]->setBounds(line.removeFromRight(theme::button_width));
+            combos_order[+type]->setBounds(line.removeFromRight(theme::button_width));
             line.removeFromRight(theme::margin);
-            checkboxes_type[type]->setBounds(line.removeFromLeft(theme::button_width));
+            checkboxes_type[+type]->setBounds(line.removeFromLeft(theme::button_width));
             line.removeFromLeft(theme::margin);
-            labels_desc[type]->setBounds(line.removeFromLeft(theme::label_width));
+            labels_desc[+type]->setBounds(line.removeFromLeft(theme::label_width));
             line.removeFromLeft(theme::margin);
-            edits_freq[type]->setBounds(line);
+            edits_freq[+type]->setBounds(line);
             area.removeFromTop(theme::margin);
         }
         group.setBounds(getLocalBounds());
